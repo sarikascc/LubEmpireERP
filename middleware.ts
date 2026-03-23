@@ -14,15 +14,18 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        // ADDED EXPLICIT ANY TYPE TO BYPASS VERCEL BUILD CRASH
+        setAll(cookiesToSet: any[]) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value),
+            request.cookies.set({ name, value, ...options }),
           );
+
           supabaseResponse = NextResponse.next({
             request,
           });
+
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options),
+            supabaseResponse.cookies.set({ name, value, ...options }),
           );
         },
       },
@@ -33,15 +36,16 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isDashboardPage = request.nextUrl.pathname.startsWith("/(dashboard)");
-  const isLoginPage = request.nextUrl.pathname.startsWith("/login");
-
-  if (!user && !isLoginPage) {
+  // Redirect unauthenticated users to login
+  if (!user && !request.nextUrl.pathname.startsWith("/login")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (user && isLoginPage) {
-    return NextResponse.redirect(new URL("/materials/raw-materials", request.url));
+  // Redirect authenticated users away from login
+  if (user && request.nextUrl.pathname.startsWith("/login")) {
+    return NextResponse.redirect(
+      new URL("/materials/raw-materials", request.url),
+    );
   }
 
   return supabaseResponse;
