@@ -25,8 +25,8 @@ export default async function ContainersPage({
 
   const supabase = await createClient();
 
-  let containersData = [];
-  let transactionsData = [];
+  let containersData: any[] = [];
+  let transactionsData: any[] = [];
   let count = 0;
 
   // --- DATA FETCHING BASED ON ACTIVE TAB ---
@@ -55,25 +55,33 @@ export default async function ContainersPage({
 
   const totalPages = Math.ceil(count / pageSize);
 
-  // 2. Fetch Materials (Boxes, Stickers, Caps)
-  const { data: materials } = await supabase
+  // --- THE FIX: STRICT ARRAY HANDLING FOR CLIENT COMPONENTS ---
+  const { data: materialsData, error: materialsError } = await supabase
     .from("materials")
     .select("id, name, type")
     .in("type", ["Box", "Sticker", "Cap"]);
 
-  const boxes = materials?.filter((m) => m.type === "Box") || [];
-  const stickers = materials?.filter((m) => m.type === "Sticker") || [];
-  const caps = materials?.filter((m) => m.type === "Cap") || [];
+  if (materialsError)
+    console.error("Error fetching materials:", materialsError);
 
-  // 3. Fetch all containers just for the Stock-In Modal
+  // Force a fallback to an empty array to prevent undefined Next.js crashes
+  const safeMaterials = materialsData || [];
+
+  const boxes = safeMaterials.filter((m) => m.type === "Box");
+  const stickers = safeMaterials.filter((m) => m.type === "Sticker");
+  const caps = safeMaterials.filter((m) => m.type === "Cap");
+
+  // Fetch all containers just for the Stock-In Modal
   const { data: allContainers } = await supabase
     .from("containers")
     .select("id, name")
     .order("name");
 
+  const safeAllContainers = allContainers || [];
+
   const getMaterialName = (id: string | null) => {
     if (!id) return null;
-    return materials?.find((m) => m.id === id)?.name || "Unknown";
+    return safeMaterials.find((m) => m.id === id)?.name || "Unknown";
   };
 
   const buildPaginationUrl = (newPage: number) => {
@@ -132,9 +140,12 @@ export default async function ContainersPage({
               <table className="erp-table w-full table-fixed min-w-[1100px]">
                 <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
                   <tr>
-                    {/* CHANGED: Name to 25% (was 20%) and Actions to 10% (was 15%) */}
-                    <th className="w-[25%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                      Bottle_Bucket Name
+                    {/* ADDED TYPE COLUMN AND REBALANCED WIDTHS */}
+                    <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                      Name
+                    </th>
+                    <th className="w-[10%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                      Type
                     </th>
                     <th className="w-[10%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Stock
@@ -148,7 +159,7 @@ export default async function ContainersPage({
                     <th className="w-[15%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Cap
                     </th>
-                    <th className="w-[15%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[10%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Sticker
                     </th>
                     <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
@@ -167,8 +178,25 @@ export default async function ContainersPage({
                           {container.name}
                         </td>
 
+                        {/* NEW TYPE BADGE COLUMN */}
+                        <td className="p-4 text-left align-middle">
+                          <span
+                            className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md border ${
+                              container.type?.toLowerCase() === "bucket"
+                                ? "bg-orange-50 text-orange-600 border-orange-100"
+                                : "bg-blue-50 text-blue-600 border-blue-100"
+                            }`}
+                          >
+                            {container.type || "Bottle"}
+                          </span>
+                        </td>
+
                         <td
-                          className={`p-4 text-center align-middle font-bold ${container.stock <= 0 ? "text-red-500" : "text-green-600"}`}
+                          className={`p-4 text-center align-middle font-bold ${
+                            container.stock <= 0
+                              ? "text-red-500"
+                              : "text-green-600"
+                          }`}
                         >
                           {Number(container.stock).toFixed(0)}
                         </td>
@@ -179,6 +207,7 @@ export default async function ContainersPage({
                             {container.capacity_unit}
                           </div>
                         </td>
+
                         <td className="p-4 text-left align-middle">
                           {container.box_id ? (
                             <>
@@ -195,6 +224,7 @@ export default async function ContainersPage({
                             </span>
                           )}
                         </td>
+
                         <td className="p-4 text-left align-middle">
                           {container.cap_id ? (
                             <>
@@ -214,6 +244,7 @@ export default async function ContainersPage({
                             </span>
                           )}
                         </td>
+
                         <td className="p-4 text-left align-middle">
                           <div className="text-sm font-semibold text-gray-700 truncate">
                             {getMaterialName(container.sticker_id) ||
@@ -226,6 +257,7 @@ export default async function ContainersPage({
                             </span>
                           </div>
                         </td>
+
                         <td className="p-4 text-right align-middle">
                           <ContainerRowActions
                             container={container}
@@ -239,7 +271,7 @@ export default async function ContainersPage({
                   ) : (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={8} // Updated colSpan to 8 to match the new column count!
                         className="text-center py-20 text-gray-400"
                       >
                         No Bottles/Buckets found.
@@ -260,7 +292,7 @@ export default async function ContainersPage({
                 Bottles/Buckets Purchase History
               </h3>
               <div className="flex items-center gap-2 shrink-0">
-                <ContainerStockInModal containers={allContainers || []} />
+                <ContainerStockInModal containers={safeAllContainers} />
               </div>
             </div>
 
@@ -339,13 +371,21 @@ export default async function ContainersPage({
             <div className="flex gap-2">
               <Link
                 href={buildPaginationUrl(currentPage - 1)}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg border ${currentPage <= 1 ? "pointer-events-none opacity-50 bg-gray-50" : "bg-white hover:bg-gray-50"}`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg border ${
+                  currentPage <= 1
+                    ? "pointer-events-none opacity-50 bg-gray-50"
+                    : "bg-white hover:bg-gray-50"
+                }`}
               >
                 Previous
               </Link>
               <Link
                 href={buildPaginationUrl(currentPage + 1)}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg border ${currentPage >= totalPages ? "pointer-events-none opacity-50 bg-gray-50" : "bg-white hover:bg-gray-50"}`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg border ${
+                  currentPage >= totalPages
+                    ? "pointer-events-none opacity-50 bg-gray-50"
+                    : "bg-white hover:bg-gray-50"
+                }`}
               >
                 Next
               </Link>

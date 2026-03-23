@@ -9,6 +9,9 @@ export async function addContainerAction(formData: FormData) {
   const capacity_per_piece = Number(formData.get("capacity_per_piece"));
   const capacity_unit = formData.get("capacity_unit") as string;
 
+  // ---> NEW: Extract type from formData
+  const type = formData.get("type") as string;
+
   // Box (Optional)
   const box_id = formData.get("box_id") as string;
   const pieces_per_box = Number(formData.get("pieces_per_box")) || 1;
@@ -25,6 +28,7 @@ export async function addContainerAction(formData: FormData) {
 
   const { error } = await supabase.from("containers").insert({
     name,
+    type, // ---> NEW: Save type to DB
     stock: 0, // Starts at 0 when you first create it
     capacity_per_piece,
     capacity_unit,
@@ -50,6 +54,9 @@ export async function editContainerAction(formData: FormData) {
   const capacity_per_piece = Number(formData.get("capacity_per_piece"));
   const capacity_unit = formData.get("capacity_unit") as string;
 
+  // ---> NEW: Extract type from formData
+  const type = formData.get("type") as string;
+
   const box_id = formData.get("box_id") as string;
   const pieces_per_box = Number(formData.get("pieces_per_box")) || 1;
 
@@ -65,6 +72,7 @@ export async function editContainerAction(formData: FormData) {
     .from("containers")
     .update({
       name,
+      type, // ---> NEW: Update type in DB
       capacity_per_piece,
       capacity_unit,
       pieces_per_box,
@@ -85,13 +93,8 @@ export async function deleteContainerAction(formData: FormData) {
   const id = formData.get("id") as string;
   const supabase = await createClient();
 
-  // Step 1: Clear the transaction history so the DB doesn't block the delete
   await supabase.from("container_transactions").delete().eq("container_id", id);
-
-  // Step 2: Clear any sales orders linked to this container type
   await supabase.from("orders").delete().eq("container_id", id);
-
-  // Step 3: Safe Delete
   const { error } = await supabase.from("containers").delete().eq("id", id);
 
   if (error) throw new Error(error.message);
@@ -110,7 +113,6 @@ export async function purchaseContainerAction(formData: FormData) {
 
   const supabase = await createClient();
 
-  // Fetch current container stock
   const { data: container, error: fetchError } = await supabase
     .from("containers")
     .select("name, stock")
@@ -119,14 +121,12 @@ export async function purchaseContainerAction(formData: FormData) {
 
   if (fetchError || !container) throw new Error("Container not found");
 
-  // Update the ACTUAL stock
   const newStock = Number(container.stock || 0) + quantity;
   await supabase
     .from("containers")
     .update({ stock: newStock })
     .eq("id", container_id);
 
-  // Log to Container Transactions (for the History tab)
   await supabase.from("container_transactions").insert({
     container_id,
     transaction_type: "Purchase",
@@ -135,7 +135,6 @@ export async function purchaseContainerAction(formData: FormData) {
     reason: supplier,
   });
 
-  // Log the financial expense
   const { error: accError } = await supabase.from("accounting_entries").insert({
     entry_type: "Expense",
     amount: total_cost,
@@ -166,7 +165,6 @@ export async function adjustContainerAction(formData: FormData) {
   let currentStock = Number(container.stock || 0);
   const isRemoving = adjustment_type === "Remove Quantity";
 
-  // SAFETY CHECK: Don't remove more than exists
   if (isRemoving && quantity > currentStock) {
     throw new Error(
       `Cannot remove ${quantity}. Only ${currentStock} empty containers left in stock.`,
@@ -176,14 +174,12 @@ export async function adjustContainerAction(formData: FormData) {
   const actualQuantity = isRemoving ? -Math.abs(quantity) : Math.abs(quantity);
   const newStock = currentStock + actualQuantity;
 
-  // Update stock
   const { error } = await supabase
     .from("containers")
     .update({ stock: newStock })
     .eq("id", container_id);
   if (error) throw new Error(`Database Error: ${error.message}`);
 
-  // Log adjustment
   await supabase.from("container_transactions").insert({
     container_id,
     transaction_type: isRemoving ? "Manual Remove" : "Manual Add",

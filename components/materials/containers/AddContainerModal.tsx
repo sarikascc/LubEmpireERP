@@ -33,6 +33,10 @@ export default function AddContainerModal({
   };
 
   async function handleSubmit(formData: FormData) {
+    // 🚨 IMPORTANT: Inject the current state of the toggle into the form data
+    // so the database knows if it is a Bottle or a Bucket!
+    formData.append("type", containerType);
+
     await addContainerAction(formData);
     setIsOpen(false);
 
@@ -95,7 +99,7 @@ export default function AddContainerModal({
                           : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      Small Bottle (Boxed)
+                      Bottle
                     </button>
                     <button
                       type="button"
@@ -110,7 +114,7 @@ export default function AddContainerModal({
                           : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      Bucket / Drum (Bulk)
+                      Bucket
                     </button>
                   </div>
                 </div>
@@ -163,10 +167,9 @@ export default function AddContainerModal({
                     <>
                       {/* --- 2. MASTER BOX --- */}
                       <div className="md:col-span-2 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
-                        <h3 className={labelClass}>Cardboard Master Box</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="md:col-span-2">
-                            <label className={labelClass}>Select Box</label>
+                            <label className={labelClass}>Box</label>
                             <select
                               className={`${glassInput} w-full`}
                               name="box_id"
@@ -224,6 +227,7 @@ export default function AddContainerModal({
                             type="number"
                             name="cap_quantity"
                             min="1"
+                            defaultValue={1} // Defaults to 1 to save Mam time
                             disabled={!selectedCap}
                             onKeyDown={blockInvalidChars}
                           />
@@ -260,6 +264,7 @@ export default function AddContainerModal({
                         type="number"
                         name="sticker_quantity"
                         min="1"
+                        defaultValue={1} // Defaults to 1
                         required
                         onKeyDown={blockInvalidChars}
                       />
