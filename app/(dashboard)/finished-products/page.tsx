@@ -59,7 +59,6 @@ export default async function FinishedProductsPage({
 
   const totalPages = Math.ceil(count / pageSize);
 
-  // Fetch data needed for the Production Entry Modal
   const { data: allFinishedProducts } = await supabase
     .from("finished_products")
     .select("id, product_name, grade_name, unit")
@@ -80,7 +79,6 @@ export default async function FinishedProductsPage({
 
   return (
     <div className="flex flex-col h-[calc(100vh-3rem)] gap-4">
-      {/* --- TOP TAB NAVIGATION --- */}
       <div className="shrink-0">
         <div className="flex items-center gap-1 p-1.5 bg-white/40 backdrop-blur-md border border-white/60 shadow-sm rounded-full w-max">
           <Link
@@ -107,9 +105,6 @@ export default async function FinishedProductsPage({
       </div>
 
       <div className="flex flex-col flex-1 shadow-sm border border-gray-100 rounded-xl overflow-hidden bg-white min-h-0">
-        {/* ========================================= */}
-        {/* ============ PRODUCTS TAB =============== */}
-        {/* ========================================= */}
         {tab === "products" && (
           <>
             <div className="p-4 border-b border-gray-100 flex flex-col xl:flex-row justify-between items-center gap-4 bg-white shrink-0">
@@ -179,9 +174,6 @@ export default async function FinishedProductsPage({
           </>
         )}
 
-        {/* ========================================= */}
-        {/* ======== PRODUCTION HISTORY TAB ========= */}
-        {/* ========================================= */}
         {tab === "production-history" && (
           <>
             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
@@ -252,7 +244,6 @@ export default async function FinishedProductsPage({
           </>
         )}
 
-        {/* --- PAGINATION FOOTER --- */}
         {count > 0 && (
           <div className="p-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 shrink-0">
             <div className="text-sm text-gray-500">

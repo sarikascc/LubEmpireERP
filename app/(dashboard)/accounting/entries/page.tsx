@@ -136,7 +136,7 @@ export default async function AccountingEntriesPage({
                       )}
                     </td>
 
-                    {/* DYNAMIC RATE COLUMN */}
+                    
                     <td className="p-4 text-center">
                       {entry.rate ? (
                         <div className="text-sm font-medium text-gray-600">
@@ -172,7 +172,7 @@ export default async function AccountingEntriesPage({
           </table>
         </div>
 
-        {/* --- PAGINATION FOOTER --- */}
+        
         {count !== null && count > 0 && (
           <div className="p-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 shrink-0">
             <div className="text-sm text-gray-500">

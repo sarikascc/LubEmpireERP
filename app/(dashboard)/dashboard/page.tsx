@@ -4,7 +4,6 @@ import Link from "next/link";
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  // 1. FETCH ACCOUNTING DATA (Income vs Expense)
   const { data: accounting } = await supabase
     .from("accounting_entries")
     .select("entry_type, amount");
@@ -19,7 +18,6 @@ export default async function DashboardPage() {
       ?.filter((a) => a.entry_type === "Expense")
       .reduce((sum, a) => sum + Number(a.amount), 0) || 0;
 
-  // 2. FETCH ORDER STATS
   const { data: recentOrders, count: orderCount } = await supabase
     .from("orders")
     .select("order_number, customer_name, total_amount, created_at", {
@@ -28,7 +26,6 @@ export default async function DashboardPage() {
     .order("created_at", { ascending: false })
     .limit(5);
 
-  // 3. FETCH OUT OF STOCK ITEMS (Stock <= 0)
   const { data: allMaterials } = await supabase
     .from("materials")
     .select("name, stock, unit, type");
@@ -39,7 +36,6 @@ export default async function DashboardPage() {
     .from("finished_products")
     .select("product_name, stock, unit");
 
-  // Filter ONLY items that have hit 0 (or dropped below due to a manual adjustment)
   const outOfStockAlerts = [
     ...(allProducts || [])
       .filter((p) => Number(p.stock) <= 0)
@@ -67,7 +63,6 @@ export default async function DashboardPage() {
       })),
   ];
 
-  // Formatting Helpers
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-IN", {
       style: "currency",
@@ -75,7 +70,6 @@ export default async function DashboardPage() {
       maximumFractionDigits: 0,
     }).format(amount);
 
-  // Chart Math
   const totalCashflow = totalIncome + totalExpense;
   const incomePercent =
     totalCashflow === 0 ? 0 : (totalIncome / totalCashflow) * 100;
@@ -84,9 +78,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="w-full space-y-6">
-      {/* --- TOP ROW: KPI CARDS --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-        {/* Total Income */}
         <div className="bg-white p-6 rounded-xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 flex flex-col justify-center min-w-0 transition-transform hover:-translate-y-1">
           <p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">
             Total Income
@@ -96,7 +88,6 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* Total Expenses */}
         <div className="bg-white p-6 rounded-xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 flex flex-col justify-center min-w-0 transition-transform hover:-translate-y-1">
           <p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">
             Total Expenses
@@ -106,7 +97,6 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* Total Orders */}
         <div className="bg-white p-6 rounded-xl shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] border border-gray-100 flex flex-col justify-center min-w-0 transition-transform hover:-translate-y-1">
           <p className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-1">
             Total Orders Fulfilled
@@ -118,9 +108,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
-        {/* --- LEFT COLUMN: CHART & RECENT SALES --- */}
         <div className="lg:col-span-2 space-y-6 min-w-0 flex flex-col">
-          {/* FINANCIAL OVERVIEW CHART */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 min-w-0">
             <h2 className="text-lg font-bold text-[#3F4A90] mb-4">
               Financial Overview
@@ -153,7 +141,6 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          {/* RECENT SALES TABLE */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 min-w-0 flex-1 flex flex-col">
             <div className="p-6 border-b border-gray-50 flex justify-between items-center">
               <h2 className="text-lg font-bold text-[#3F4A90]">Recent Sales</h2>
@@ -234,7 +221,6 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* --- RIGHT COLUMN: OUT OF STOCK ALERTS --- */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-w-0 flex flex-col h-full max-h-[750px]">
           <h2 className="text-lg font-bold text-red-600 mb-1 flex items-center gap-2">
             Out of Stock Alerts

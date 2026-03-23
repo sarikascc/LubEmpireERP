@@ -12,7 +12,7 @@ export default async function ContainersPage({
     page?: string;
     search?: string;
     tab?: string;
-    typeFilter?: string; // <-- 1. ADDED TYPE FILTER INTERFACE
+    typeFilter?: string;
   }>;
 }) {
   const resolvedParams = await searchParams;
@@ -31,7 +31,6 @@ export default async function ContainersPage({
   let transactionsData: any[] = [];
   let count = 0;
 
-  // --- DATA FETCHING BASED ON ACTIVE TAB ---
   if (tab === "containers") {
     let query = supabase
       .from("containers")
@@ -40,7 +39,6 @@ export default async function ContainersPage({
 
     if (search) query = query.ilike("name", `%${search}%`);
 
-    // <-- 3. APPLY TYPE FILTER TO DATABASE QUERY
     if (typeFilter !== "all") query = query.eq("type", typeFilter);
 
     const { data, count: c } = await query.range(from, to);
@@ -60,7 +58,6 @@ export default async function ContainersPage({
 
   const totalPages = Math.ceil(count / pageSize);
 
-  // --- THE FIX: STRICT ARRAY HANDLING FOR CLIENT COMPONENTS ---
   const { data: materialsData, error: materialsError } = await supabase
     .from("materials")
     .select("id, name, type")
@@ -69,14 +66,12 @@ export default async function ContainersPage({
   if (materialsError)
     console.error("Error fetching materials:", materialsError);
 
-  // Force a fallback to an empty array to prevent undefined Next.js crashes
   const safeMaterials = materialsData || [];
 
   const boxes = safeMaterials.filter((m) => m.type === "Box");
   const stickers = safeMaterials.filter((m) => m.type === "Sticker");
   const caps = safeMaterials.filter((m) => m.type === "Cap");
 
-  // Fetch all containers just for the Stock-In Modal
   const { data: allContainers } = await supabase
     .from("containers")
     .select("id, name")
@@ -100,7 +95,6 @@ export default async function ContainersPage({
 
   return (
     <div className="flex flex-col h-[calc(100vh-3rem)] gap-4">
-      {/* --- TOP TAB NAVIGATION --- */}
       <div className="shrink-0">
         <div className="flex items-center gap-1 p-1.5 bg-white/40 backdrop-blur-md border border-white/60 shadow-sm rounded-full w-max">
           <Link
@@ -126,9 +120,7 @@ export default async function ContainersPage({
         </div>
       </div>
 
-      {/* --- MAIN CONTENT AREA --- */}
       <div className="flex flex-col flex-1 shadow-sm border border-gray-100 rounded-xl overflow-hidden bg-white min-h-0">
-        {/* TAB 1: CONTAINERS & RECIPES */}
         {tab === "containers" && (
           <>
             <div className="p-4 border-b border-gray-100 flex flex-col xl:flex-row justify-between items-center gap-4 bg-white shrink-0">
@@ -288,7 +280,6 @@ export default async function ContainersPage({
           </>
         )}
 
-        {/* TAB 2: PURCHASE HISTORY */}
         {tab === "stock-in" && (
           <>
             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white shrink-0">
@@ -364,7 +355,6 @@ export default async function ContainersPage({
           </>
         )}
 
-        {/* --- PAGINATION FOOTER --- */}
         {count > 0 && (
           <div className="p-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 shrink-0">
             <div className="text-sm text-gray-500">

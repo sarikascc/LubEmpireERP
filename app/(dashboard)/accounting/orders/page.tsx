@@ -25,7 +25,6 @@ export default async function OrdersPage({
 
   const supabase = await createClient();
 
-  // FIXED: Querying "containers" exactly as it is named in your Supabase DB
   let query = supabase
     .from("orders")
     .select(
@@ -66,7 +65,6 @@ export default async function OrdersPage({
     .select("id, product_name, grade_name, stock, unit")
     .order("product_name");
 
-  // FIXED: Fetching from "containers"
   const { data: containersList } = await supabase
     .from("containers")
     .select("id, name, pieces_per_box")
@@ -157,7 +155,7 @@ export default async function OrdersPage({
                             ({order.finished_products?.grade_name})
                           </span>
                         </div>
-                        {/* FIXED: Reading from containers relation */}
+
                         <div className="text-xs font-medium text-[var(--lub-gold)] mt-0.5 truncate">
                           Pack: {order.containers?.name}
                         </div>
@@ -166,7 +164,7 @@ export default async function OrdersPage({
                         <div className="font-bold text-gray-800">
                           {order.boxes_quantity}
                         </div>
-                        {/* FIXED: Reading multiplier from containers relation */}
+
                         <div className="text-[10px] text-gray-500 mt-0.5">
                           {order.boxes_quantity *
                             (order.containers?.pieces_per_box || 1)}{" "}

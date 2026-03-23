@@ -76,7 +76,6 @@ export default async function RawMaterialsPage({
 
   return (
     <div className="flex flex-col h-[calc(100vh-3rem)] gap-4">
-      {/* --- TOP TAB NAVIGATION (GLASSY STADIUM) --- */}
       <div className="shrink-0">
         <div className="flex items-center gap-1 p-1.5 bg-white/40 backdrop-blur-md border border-white/60 shadow-sm rounded-full w-max">
           <Link
@@ -102,7 +101,6 @@ export default async function RawMaterialsPage({
         </div>
       </div>
 
-      {/* Main Container - min-h-0 allows the table inside to scroll properly */}
       <div className="flex flex-col flex-1 shadow-sm border border-gray-100 rounded-xl overflow-hidden bg-white min-h-0">
         {tab === "materials" && (
           <>

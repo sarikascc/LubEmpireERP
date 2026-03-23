@@ -72,7 +72,6 @@ export default async function BoxesPage({
 
   return (
     <div className="flex flex-col h-[calc(100vh-3rem)] gap-4">
-      {/* --- TOP TAB NAVIGATION (GLASSY STADIUM) --- */}
       <div className="shrink-0">
         <div className="flex items-center gap-1 p-1.5 bg-white/40 backdrop-blur-md border border-white/60 shadow-sm rounded-full w-max">
           <Link
