@@ -12,12 +12,14 @@ export default async function ContainersPage({
     page?: string;
     search?: string;
     tab?: string;
+    typeFilter?: string; // <-- 1. ADDED TYPE FILTER INTERFACE
   }>;
 }) {
   const resolvedParams = await searchParams;
   const currentPage = Number(resolvedParams.page) || 1;
   const search = resolvedParams.search || "";
   const tab = resolvedParams.tab || "containers";
+  const typeFilter = resolvedParams.typeFilter || "all"; // <-- 2. EXTRACT TYPE FILTER
   const pageSize = 20;
 
   const from = (currentPage - 1) * pageSize;
@@ -37,6 +39,9 @@ export default async function ContainersPage({
       .order("name", { ascending: true });
 
     if (search) query = query.ilike("name", `%${search}%`);
+
+    // <-- 3. APPLY TYPE FILTER TO DATABASE QUERY
+    if (typeFilter !== "all") query = query.eq("type", typeFilter);
 
     const { data, count: c } = await query.range(from, to);
     containersData = data || [];
@@ -89,6 +94,7 @@ export default async function ContainersPage({
     params.set("page", newPage.toString());
     params.set("tab", tab);
     if (search) params.set("search", search);
+    if (typeFilter !== "all") params.set("typeFilter", typeFilter); // <-- 4. KEEP FILTER ON PAGINATION
     return `?${params.toString()}`;
   };
 
@@ -140,7 +146,6 @@ export default async function ContainersPage({
               <table className="erp-table w-full table-fixed min-w-[1100px]">
                 <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
                   <tr>
-                    {/* ADDED TYPE COLUMN AND REBALANCED WIDTHS */}
                     <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Name
                     </th>
@@ -178,7 +183,6 @@ export default async function ContainersPage({
                           {container.name}
                         </td>
 
-                        {/* NEW TYPE BADGE COLUMN */}
                         <td className="p-4 text-left align-middle">
                           <span
                             className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md border ${
@@ -271,7 +275,7 @@ export default async function ContainersPage({
                   ) : (
                     <tr>
                       <td
-                        colSpan={8} // Updated colSpan to 8 to match the new column count!
+                        colSpan={8}
                         className="text-center py-20 text-gray-400"
                       >
                         No Bottles/Buckets found.

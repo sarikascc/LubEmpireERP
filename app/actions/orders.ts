@@ -149,15 +149,18 @@ export async function createOrderAction(formData: FormData) {
 
   if (orderError) throw new Error(`Order Error: ${orderError.message}`);
 
-  // 9. LOG ACCOUNTING ENTRY
+  // 9. LOG ACCOUNTING ENTRY WITH QTY & RATE (NEW UPDATES HERE)
+  const rate_per_box = rate_per_piece * container.pieces_per_box;
+
   await supabase.from("accounting_entries").insert({
     entry_type: "Income",
     amount: total_amount,
+    quantity: boxes_quantity, // ADDED
+    rate: rate_per_box, // ADDED
+    unit: "Boxes", // ADDED
     description: `Sales Order - ${customer_name} (${boxes_quantity} Cartons of ${fp.product_name})`,
   });
 
-  // 10. Refresh all relevant paths
-  revalidatePath("/accounting/orders");
-  revalidatePath("/accounting/entries");
-  revalidatePath("/materials/bottles_buckets");
+  // 10. Refresh all relevant paths (UPDATED TO FIX UI REFRESH)
+  revalidatePath("/", "layout");
 }

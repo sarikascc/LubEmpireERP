@@ -21,14 +21,12 @@ export default async function AccountingEntriesPage({
 
   const supabase = await createClient();
 
-  // Querying your exact table name
   let query = supabase
     .from("accounting_entries")
     .select("*", { count: "exact" })
     .order("created_at", { ascending: false });
 
   if (search) query = query.ilike("description", `%${search}%`);
-  // Using your exact column name
   if (currentType !== "all") query = query.eq("entry_type", currentType);
 
   const { data: entriesData, count } = await query.range(from, to);
@@ -45,6 +43,7 @@ export default async function AccountingEntriesPage({
   return (
     <div className="flex flex-col h-[calc(100vh-3rem)] gap-4">
       <div className="flex flex-col flex-1 shadow-sm border border-gray-100 rounded-xl overflow-hidden bg-white min-h-0">
+        {/* --- FILTERS --- */}
         <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white shrink-0">
           <div className="flex gap-2 bg-gray-50/80 p-1.5 rounded-lg border border-gray-100">
             <Link
@@ -68,21 +67,29 @@ export default async function AccountingEntriesPage({
           </div>
         </div>
 
+        {/* --- MAIN TABLE --- */}
         <div className="overflow-auto flex-1 bg-white">
-          <table className="erp-table w-full table-fixed min-w-[800px]">
+          <table className="erp-table w-full table-fixed min-w-[900px]">
             <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
               <tr>
-                <th className="w-[15%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                <th className="w-[12%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Date
                 </th>
-                <th className="w-[15%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                <th className="w-[10%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Type
                 </th>
-                <th className="w-[50%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                <th className="w-[38%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Description
                 </th>
-                <th className="w-[20%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                  Amount
+                {/* NEW COLUMNS */}
+                <th className="w-[10%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Qty
+                </th>
+                <th className="w-[12%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Rate (₹)
+                </th>
+                <th className="w-[18%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Total Amount
                 </th>
               </tr>
             </thead>
@@ -100,6 +107,7 @@ export default async function AccountingEntriesPage({
                         year: "numeric",
                       })}
                     </td>
+
                     <td className="p-4">
                       <span
                         className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest ${entry.entry_type === "Income" ? "bg-green-50 text-green-600 border border-green-100" : "bg-red-50 text-red-500 border border-red-100"}`}
@@ -107,11 +115,38 @@ export default async function AccountingEntriesPage({
                         {entry.entry_type}
                       </span>
                     </td>
+
                     <td className="p-4">
                       <div className="text-sm font-bold text-gray-800 break-words">
                         {entry.description}
                       </div>
                     </td>
+
+                    {/* DYNAMIC QTY COLUMN */}
+                    <td className="p-4 text-center">
+                      {entry.quantity ? (
+                        <div className="text-sm font-bold text-gray-700">
+                          {entry.quantity}{" "}
+                          <span className="text-[10px] text-gray-400 font-normal uppercase">
+                            {entry.unit || "PCS"}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-300">-</span>
+                      )}
+                    </td>
+
+                    {/* DYNAMIC RATE COLUMN */}
+                    <td className="p-4 text-center">
+                      {entry.rate ? (
+                        <div className="text-sm font-medium text-gray-600">
+                          ₹{Number(entry.rate).toLocaleString("en-IN")}
+                        </div>
+                      ) : (
+                        <span className="text-gray-300">-</span>
+                      )}
+                    </td>
+
                     <td className="p-4 text-right">
                       <div
                         className={`text-lg font-black tracking-tight ${entry.entry_type === "Income" ? "text-green-600" : "text-gray-800"}`}
@@ -126,7 +161,7 @@ export default async function AccountingEntriesPage({
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} className="text-center py-24">
+                  <td colSpan={6} className="text-center py-24">
                     <p className="text-gray-400 font-medium">
                       No accounting entries found.
                     </p>
@@ -137,6 +172,7 @@ export default async function AccountingEntriesPage({
           </table>
         </div>
 
+        {/* --- PAGINATION FOOTER --- */}
         {count !== null && count > 0 && (
           <div className="p-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50 shrink-0">
             <div className="text-sm text-gray-500">

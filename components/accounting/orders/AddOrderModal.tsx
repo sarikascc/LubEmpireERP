@@ -21,19 +21,28 @@ export default function AddOrderModal({
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 1. NEW STATE TO HOLD THE ERROR MESSAGE
+  const [errorMsg, setErrorMsg] = useState("");
+
   const blockInvalidChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
   };
 
   async function handleSubmit(formData: FormData) {
     setIsSubmitting(true);
+    setErrorMsg(""); // Clear any previous errors
+
     try {
       await createOrderAction(formData);
       setIsOpen(false);
       router.refresh();
     } catch (error: any) {
       console.error(error);
-      alert(error.message);
+      // 2. CATCH ERROR AND SET TO STATE INSTEAD OF alert()
+      setErrorMsg(
+        error.message ||
+          "An unexpected error occurred while creating the order.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -50,7 +59,10 @@ export default function AddOrderModal({
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setIsOpen(true);
+          setErrorMsg(""); // Clear errors when opening modal freshly
+        }}
         className="h-[38px] px-4 bg-[var(--lub-gold)] hover:bg-yellow-500 text-white text-sm font-bold rounded-md transition-colors shadow-sm shrink-0 flex items-center justify-center gap-2"
       >
         + Create Sales Order
@@ -76,6 +88,13 @@ export default function AddOrderModal({
               className="flex flex-col flex-1 min-h-0"
             >
               <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                {/* 3. IN-MODAL ERROR DISPLAY */}
+                {errorMsg && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 font-medium">
+                    ⚠️ {errorMsg}
+                  </div>
+                )}
+
                 {/* 1. CUSTOMER NAME */}
                 <div>
                   <label className={labelClass}>Customer / Client Name</label>
