@@ -146,7 +146,6 @@ export default function FinishedProductRowActions({
               </button>
             </div>
 
-            {/* CHANGED FROM action= TO onSubmit= */}
             <form
               onSubmit={handleEditSubmit}
               className="flex flex-col flex-1 min-h-0"
@@ -222,8 +221,9 @@ export default function FinishedProductRowActions({
 
       {/* --- DELETE CONFIRMATION MODAL --- */}
       {isDeleteOpen && (
-        <div className={`${glassBackdrop} text-center`}>
-          <div className={`${glassModal} !w-auto !max-w-sm p-8`}>
+        <div className={glassBackdrop}>
+          {/* Added text-center here to override the text-left from the backdrop */}
+          <div className={`${glassModal} !max-w-sm w-full p-8 text-center`}>
             <div className="w-16 h-16 bg-red-50/80 backdrop-blur-sm border border-red-100 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
               <svg
                 className="w-8 h-8"
@@ -242,6 +242,9 @@ export default function FinishedProductRowActions({
             <h3 className="text-xl font-extrabold text-gray-900">
               Are you sure?
             </h3>
+            <p className="text-sm text-gray-500 mt-2">
+              This action cannot be undone.
+            </p>
             <div className="flex gap-3 mt-8">
               <button
                 onClick={() => setIsDeleteOpen(false)}

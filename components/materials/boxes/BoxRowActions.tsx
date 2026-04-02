@@ -347,8 +347,8 @@ export default function BoxRowActions({ box }: { box: any }) {
 
       {/* --- DELETE CONFIRMATION MODAL --- */}
       {isDeleteOpen && (
-        <div className={`${glassBackdrop} text-center`}>
-          <div className={`${glassModal} p-8 !w-auto !max-w-sm`}>
+        <div className={glassBackdrop}>
+          <div className={`${glassModal} p-8 !max-w-sm w-full text-center`}>
             <div className="w-16 h-16 bg-red-50/80 backdrop-blur-sm border border-red-100 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
               <svg
                 className="w-8 h-8"
@@ -367,6 +367,9 @@ export default function BoxRowActions({ box }: { box: any }) {
             <h3 className="text-xl font-extrabold text-gray-900">
               Are you sure?
             </h3>
+            <p className="text-sm text-gray-500 mt-2">
+              This action cannot be undone.
+            </p>
             <div className="flex gap-3 mt-8">
               <button
                 onClick={() => setIsDeleteOpen(false)}
