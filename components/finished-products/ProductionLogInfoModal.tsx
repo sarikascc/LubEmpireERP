@@ -66,7 +66,7 @@ export default function ProductionLogInfoModal({ log }: { log: any }) {
                       </span>
                       <div className="text-right flex items-baseline gap-1">
                         {/* 🔥 Removed blue color, set to dark grey */}
-                        <span className="font-black text-gray-800 text-lg">
+                        <span className="font-black text-gray-800">
                           {pmc.quantity_used}
                         </span>
                         <span className="text-xs text-gray-500 font-bold">
