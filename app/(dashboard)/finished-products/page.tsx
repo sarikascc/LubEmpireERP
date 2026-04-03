@@ -4,6 +4,7 @@ import AddFinishedProductModal from "@/components/finished-products/AddFinishedP
 import FinishedProductRowActions from "@/components/finished-products/FinishedProductRowActions";
 import ProductionEntryModal from "@/components/finished-products/ProductionEntryModal";
 import FinishedProductFilters from "@/components/finished-products/FinishedProductFilters";
+import ProductionLogInfoModal from "@/components/finished-products/ProductionLogInfoModal";
 
 export default async function FinishedProductsPage({
   searchParams,
@@ -25,8 +26,8 @@ export default async function FinishedProductsPage({
 
   const supabase = await createClient();
 
-  let productsData = [];
-  let productionLogsData = [];
+  let productsData: any[] = [];
+  let productionLogsData: any[] = [];
   let count = 0;
 
   if (tab === "products") {
@@ -47,9 +48,17 @@ export default async function FinishedProductsPage({
   } else if (tab === "production-history") {
     let query = supabase
       .from("production_logs")
-      .select("*, finished_products!inner(product_name, grade_name, unit)", {
-        count: "exact",
-      })
+      .select(
+        `
+        *, 
+        finished_products!inner(product_name, grade_name, unit),
+        production_material_consumption (
+          quantity_used,
+          materials (name, unit)
+        )
+      `,
+        { count: "exact" },
+      )
       .order("created_at", { ascending: false });
 
     const { data, count: c } = await query.range(from, to);
@@ -148,7 +157,6 @@ export default async function FinishedProductsPage({
                         <td
                           className={`p-4 text-center font-bold ${product.stock <= 0 ? "text-red-500" : "text-green-600"}`}
                         >
-                          {/* FLOATING POINT FIX HERE */}
                           {parseFloat(Number(product.stock).toFixed(0))}{" "}
                           <span className="text-xs font-normal text-gray-400">
                             {product.unit}
@@ -191,7 +199,8 @@ export default async function FinishedProductsPage({
               <table className="erp-table w-full table-fixed min-w-[800px]">
                 <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
                   <tr>
-                    <th className="w-[40%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    {/* 🔥 ALIGNED WIDTHS FOR PERFECT SPACING */}
+                    <th className="w-[30%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Product Manufactured
                     </th>
                     <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
@@ -200,8 +209,11 @@ export default async function FinishedProductsPage({
                     <th className="w-[20%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Quantity Produced
                     </th>
-                    <th className="w-[20%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[20%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Date
+                    </th>
+                    <th className="w-[10%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -218,22 +230,34 @@ export default async function FinishedProductsPage({
                         <td className="p-4 font-bold text-gray-600">
                           {log.finished_products?.grade_name}
                         </td>
-                        <td className="p-4 text-center font-bold text-blue-600">
-                          {/* FLOATING POINT FIX HERE */}+
-                          {parseFloat(Number(log.quantity_produced).toFixed(0))}{" "}
-                          <span className="text-xs font-normal text-gray-400">
-                            {log.finished_products?.unit}
-                          </span>
+
+                        <td className="p-4 text-center">
+                          <div className="font-bold text-black-400">
+                            +{" "}
+                            {parseFloat(
+                              Number(log.quantity_produced).toFixed(0),
+                            )}{" "}
+                            <span className="text-xs font-normal text-gray-400">
+                              {log.finished_products?.unit}
+                            </span>
+                          </div>
                         </td>
-                        <td className="p-4 text-sm text-gray-600 text-right">
+
+                        {/* Date centered for perfect spacing */}
+                        <td className="p-4 text-sm font-medium text-gray-600 text-center">
                           {new Date(log.created_at).toLocaleDateString()}
+                        </td>
+
+                        {/* Actions column beautifully aligned */}
+                        <td className="p-4 text-center">
+                          <ProductionLogInfoModal log={log} />
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={5}
                         className="text-center py-20 text-gray-400"
                       >
                         No production logs found.
