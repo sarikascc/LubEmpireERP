@@ -1,0 +1,1 @@
+ALTER TABLE public.accounting_entries ADD COLUMN IF NOT EXISTS profit NUMERIC DEFAULT 0;

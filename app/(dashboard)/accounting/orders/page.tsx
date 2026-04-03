@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import AddOrderModal from "@/components/accounting/orders/AddOrderModal";
 import OrderFilters from "@/components/accounting/orders/OrderFilter";
+import OrderRowActions from "@/components/accounting/orders/OrderRowActions";
 
 export default async function OrdersPage({
   searchParams,
@@ -62,13 +63,19 @@ export default async function OrdersPage({
 
   const { data: finishedProducts } = await supabase
     .from("finished_products")
-    .select("id, product_name, grade_name, stock, unit")
+    .select("id, product_name, grade_name, stock, unit, cost_per_unit")
     .order("product_name");
 
   const { data: containersList } = await supabase
     .from("containers")
-    .select("id, name, pieces_per_box")
+    .select(
+      "id, name, pieces_per_box, capacity_per_piece, capacity_unit, cost_per_piece, box_id, sticker_id, cap_id, cap_quantity, sticker_quantity",
+    )
     .order("name");
+
+  const { data: materials } = await supabase
+    .from("materials")
+    .select("id, cost_per_unit");
 
   const buildPaginationUrl = (newPage: number) => {
     const params = new URLSearchParams();
@@ -88,6 +95,7 @@ export default async function OrdersPage({
             <AddOrderModal
               finishedProducts={finishedProducts || []}
               containers={containersList || []}
+              materials={materials || []}
             />
           </div>
         </div>
@@ -96,23 +104,31 @@ export default async function OrdersPage({
           <table className="erp-table w-full table-fixed min-w-[1000px]">
             <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
               <tr>
-                <th className="w-[18%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                {/* Adjusted widths to fit the new column */}
+                <th className="w-[16%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Order Number
                 </th>
-                <th className="w-[12%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                <th className="w-[10%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Order Date
                 </th>
-                <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                <th className="w-[18%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Customer Name
                 </th>
-                <th className="w-[25%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                <th className="w-[18%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Product Details
                 </th>
-                <th className="w-[10%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                  Qty (Boxes/Buckets)
+                <th className="w-[8%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Qty
                 </th>
-                <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                {/* 🔥 NEW RATE COLUMN HEADER */}
+                <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Rate
+                </th>
+                <th className="w-[12%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Total Amount
+                </th>
+                <th className="w-[8%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -155,7 +171,6 @@ export default async function OrdersPage({
                             ({order.finished_products?.grade_name})
                           </span>
                         </div>
-
                         <div className="text-xs font-medium text-[var(--lub-gold)] mt-0.5 truncate">
                           Pack: {order.containers?.name}
                         </div>
@@ -164,13 +179,31 @@ export default async function OrdersPage({
                         <div className="font-bold text-gray-800">
                           {order.boxes_quantity}
                         </div>
-
                         <div className="text-[10px] text-gray-500 mt-0.5">
                           {order.boxes_quantity *
                             (order.containers?.pieces_per_box || 1)}{" "}
-                          PCS Total
+                          PCS
                         </div>
                       </td>
+
+                      {/* 🔥 NEW RATE COLUMN DATA */}
+                      <td className="p-4 text-right">
+                        <div className="font-semibold text-gray-700">
+                          ₹
+                          {Number(order.rate_per_piece).toLocaleString(
+                            "en-IN",
+                            {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            },
+                          )}
+                        </div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">
+                          per pc
+                        </div>
+                      </td>
+
+                      {/* CLEANED UP TOTAL AMOUNT COLUMN */}
                       <td className="p-4 text-right">
                         <div className="font-black text-green-600">
                           ₹
@@ -178,17 +211,19 @@ export default async function OrdersPage({
                             maximumFractionDigits: 2,
                           })}
                         </div>
-                        <div className="text-[10px] text-gray-400 font-medium mt-0.5">
-                          @ ₹{Number(order.rate_per_piece).toFixed(2)} / pc
-                        </div>
+                      </td>
+
+                      <td className="p-4 text-center">
+                        <OrderRowActions order={order} />
                       </td>
                     </tr>
                   );
                 })
               ) : (
                 <tr>
+                  {/* Updated colSpan from 7 to 8 to account for the new column */}
                   <td
-                    colSpan={6}
+                    colSpan={8}
                     className="text-center py-20 text-gray-400 font-medium"
                   >
                     No sales orders found matching your filters.

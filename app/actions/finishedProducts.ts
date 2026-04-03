@@ -85,7 +85,6 @@ export async function addProductionEntryAction(formData: FormData) {
   const finished_product_id = formData.get("finished_product_id") as string;
   const quantity_produced = Number(formData.get("quantity_produced"));
 
-  // The frontend will send the dynamic rows as a JSON string
   const rawMaterialsJSON = formData.get("raw_materials") as string;
   const consumedMaterials = JSON.parse(rawMaterialsJSON) as {
     material_id: string;
@@ -94,31 +93,44 @@ export async function addProductionEntryAction(formData: FormData) {
 
   const supabase = await createClient();
 
-  // 1. Fetch current stock of the finished product
+  // 1. Fetch current stock AND cost of the finished product
   const { data: fp, error: fpError } = await supabase
     .from("finished_products")
-    .select("stock")
+    .select("stock, cost_per_unit") // <-- ADDED cost_per_unit
     .eq("id", finished_product_id)
     .single();
   if (fpError || !fp) throw new Error("Finished Product not found");
 
-  // 2. Fetch current stock of all used raw materials for safety check
+  // 2. Fetch current stock AND cost of all used raw materials
   const materialIds = consumedMaterials.map((m) => m.material_id);
   const { data: rawMaterials } = await supabase
     .from("materials")
-    .select("id, stock, name")
+    .select("id, stock, name, cost_per_unit") // <-- ADDED cost_per_unit
     .in("id", materialIds);
 
-  // BACKEND SAFETY CHECK: Ensure we have enough raw materials
+  // 🌟 CALCULATE THE COST TO MANUFACTURE THIS BATCH 🌟
+  let totalProductionCost = 0;
+
   for (const consumed of consumedMaterials) {
     const rm = rawMaterials?.find((m) => m.id === consumed.material_id);
     if (!rm) throw new Error("Raw Material not found in database.");
     if (consumed.quantity > (rm.stock || 0)) {
-      throw new Error(
-        `Insufficient stock for ${rm.name}. Needed: ${consumed.quantity}, Available: ${rm.stock}`,
-      );
+      throw new Error(`Insufficient stock for ${rm.name}.`);
     }
+    // Multiply the amount of raw material used by its average cost
+    totalProductionCost += consumed.quantity * Number(rm.cost_per_unit || 0);
   }
+
+  // 🌟 MOVING AVERAGE MATH FOR THE FINISHED PRODUCT 🌟
+  let currentFPStock = Number(fp.stock || 0);
+  let currentFPCost = Number(fp.cost_per_unit || 0);
+
+  const currentFPValue = currentFPStock * currentFPCost;
+  const newFPStock = currentFPStock + quantity_produced;
+
+  // Blend the old oil value with the cost of the raw materials just used
+  const newFPAvgCost =
+    newFPStock > 0 ? (currentFPValue + totalProductionCost) / newFPStock : 0;
 
   // 3. Create Production Log
   const { data: prodLog, error: logError } = await supabase
@@ -129,31 +141,31 @@ export async function addProductionEntryAction(formData: FormData) {
 
   if (logError || !prodLog) throw new Error("Failed to create production log");
 
-  // 4. Update Finished Product Stock
+  // 4. Update Finished Product Stock AND New Blended Cost
   await supabase
     .from("finished_products")
-    .update({ stock: Number(fp.stock || 0) + quantity_produced })
+    .update({
+      stock: newFPStock,
+      cost_per_unit: newFPAvgCost, // <-- SAVING NEW BLENDED COST
+    })
     .eq("id", finished_product_id);
 
   // 5. Deduct Raw Materials & Log Consumption
   for (const consumed of consumedMaterials) {
     const rm = rawMaterials?.find((m) => m.id === consumed.material_id);
-    const newStock = Number(rm?.stock || 0) - consumed.quantity;
+    const newRMStock = Number(rm?.stock || 0) - consumed.quantity;
 
-    // Deduct stock
     await supabase
       .from("materials")
-      .update({ stock: newStock })
+      .update({ stock: newRMStock })
       .eq("id", consumed.material_id);
 
-    // Map it to the production log
     await supabase.from("production_material_consumption").insert({
       production_log_id: prodLog.id,
       raw_material_id: consumed.material_id,
       quantity_used: consumed.quantity,
     });
 
-    // Add to Material Transactions (For audit trails)
     await supabase.from("material_transactions").insert({
       material_id: consumed.material_id,
       transaction_type: "Production Use",

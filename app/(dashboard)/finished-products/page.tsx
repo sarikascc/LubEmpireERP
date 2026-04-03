@@ -148,7 +148,8 @@ export default async function FinishedProductsPage({
                         <td
                           className={`p-4 text-center font-bold ${product.stock <= 0 ? "text-red-500" : "text-green-600"}`}
                         >
-                          {Number(product.stock).toFixed(2)}{" "}
+                          {/* FLOATING POINT FIX HERE */}
+                          {parseFloat(Number(product.stock).toFixed(0))}{" "}
                           <span className="text-xs font-normal text-gray-400">
                             {product.unit}
                           </span>
@@ -218,7 +219,8 @@ export default async function FinishedProductsPage({
                           {log.finished_products?.grade_name}
                         </td>
                         <td className="p-4 text-center font-bold text-blue-600">
-                          +{Number(log.quantity_produced).toFixed(2)}{" "}
+                          {/* FLOATING POINT FIX HERE */}+
+                          {parseFloat(Number(log.quantity_produced).toFixed(0))}{" "}
                           <span className="text-xs font-normal text-gray-400">
                             {log.finished_products?.unit}
                           </span>

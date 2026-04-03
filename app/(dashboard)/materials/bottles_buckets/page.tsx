@@ -115,7 +115,7 @@ export default async function ContainersPage({
                 : "text-gray-500 hover:text-gray-700 hover:bg-white/50"
             }`}
           >
-            Purchase History
+            Stock-In History
           </Link>
         </div>
       </div>
@@ -145,7 +145,7 @@ export default async function ContainersPage({
                       Type
                     </th>
                     <th className="w-[10%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                      Stock
+                      Stock (PCS)
                     </th>
                     <th className="w-[10%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Capacity

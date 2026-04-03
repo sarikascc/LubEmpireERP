@@ -113,20 +113,36 @@ export async function purchaseContainerAction(formData: FormData) {
 
   const supabase = await createClient();
 
+  // 1. Fetch current stock and cost
   const { data: container, error: fetchError } = await supabase
     .from("containers")
-    .select("name, stock")
+    .select("name, stock, cost_per_piece") // <-- ADDED cost_per_piece
     .eq("id", container_id)
     .single();
 
   if (fetchError || !container) throw new Error("Container not found");
 
-  const newStock = Number(container.stock || 0) + quantity;
+  // 🌟 THE MOVING AVERAGE MATH 🌟
+  let currentStock = Number(container.stock || 0);
+  let currentAvgCost = Number(container.cost_per_piece || 0);
+
+  const currentTotalValue = currentStock * currentAvgCost;
+  const newPurchaseValue = quantity * rate;
+
+  const newStock = currentStock + quantity;
+  const newAvgCost =
+    newStock > 0 ? (currentTotalValue + newPurchaseValue) / newStock : 0;
+
+  // 2. Update Stock and Average Cost
   await supabase
     .from("containers")
-    .update({ stock: newStock })
+    .update({
+      stock: newStock,
+      cost_per_piece: newAvgCost, // <-- SAVING NEW BLENDED COST
+    })
     .eq("id", container_id);
 
+  // 3. Log Transactions
   await supabase.from("container_transactions").insert({
     container_id,
     transaction_type: "Purchase",

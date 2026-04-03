@@ -31,6 +31,8 @@ export async function editBoxAction(formData: FormData) {
   revalidatePath("/materials/boxes");
 }
 
+// app/actions/boxes.ts
+
 export async function deleteBoxAction(formData: FormData) {
   const id = formData.get("id") as string;
   const supabase = await createClient();
@@ -52,7 +54,6 @@ export async function purchaseBoxAction(formData: FormData) {
   const material_id = formData.get("material_id") as string;
   const quantity = Number(formData.get("quantity"));
   const rate = Number(formData.get("rate"));
-
   const supplier = (formData.get("supplier") as string) || "Unknown Supplier";
   const total_cost = quantity * rate;
 
@@ -60,11 +61,22 @@ export async function purchaseBoxAction(formData: FormData) {
 
   const { data: box, error: fetchError } = await supabase
     .from("materials")
-    .select("name, stock")
+    .select("name, stock, cost_per_unit") // <-- ADDED cost_per_unit
     .eq("id", material_id)
     .single();
 
   if (fetchError || !box) throw new Error("Box not found");
+
+  // 🌟 THE MOVING AVERAGE MATH 🌟
+  let currentStock = Number(box.stock || 0);
+  let currentAvgCost = Number(box.cost_per_unit || 0);
+
+  const currentTotalValue = currentStock * currentAvgCost;
+  const newPurchaseValue = quantity * rate;
+
+  const newStock = currentStock + quantity;
+  const newAvgCost =
+    newStock > 0 ? (currentTotalValue + newPurchaseValue) / newStock : 0;
 
   const { error: stockError } = await supabase
     .from("material_transactions")
@@ -78,10 +90,12 @@ export async function purchaseBoxAction(formData: FormData) {
 
   if (stockError) throw new Error("Failed to log transaction");
 
-  const newStock = Number(box.stock || 0) + quantity;
   await supabase
     .from("materials")
-    .update({ stock: newStock })
+    .update({
+      stock: newStock,
+      cost_per_unit: newAvgCost, // <-- SAVING NEW BLENDED COST
+    })
     .eq("id", material_id);
 
   const { error: accError } = await supabase.from("accounting_entries").insert({

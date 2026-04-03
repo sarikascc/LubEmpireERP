@@ -11,12 +11,14 @@ export default function ContainerStockInModal({
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedContainer, setSelectedContainer] = useState(""); // <-- Added state to match Cap modal
 
   async function handleSubmit(formData: FormData) {
     setIsSubmitting(true);
     try {
       await purchaseContainerAction(formData);
       setIsOpen(false);
+      setSelectedContainer(""); // <-- Reset on success
       router.refresh();
     } catch (error) {
       console.error(error);
@@ -35,12 +37,25 @@ export default function ContainerStockInModal({
 
   return (
     <>
+      {/* 🟦 UPDATED TRIGGER BUTTON (Blue with SVG) */}
       <button
         onClick={() => setIsOpen(true)}
-        className="h-[38px] px-4 bg-white hover:bg-gray-50 text-[var(--lub-dark)] border border-gray-200 text-sm font-bold rounded-md transition-colors shadow-sm shrink-0 flex items-center justify-center gap-2"
+        className="h-[38px] px-4 bg-[var(--lub-blue)] hover:bg-[#2e376b] text-white text-sm font-bold rounded-md transition-colors shadow-sm shrink-0 flex items-center justify-center gap-2"
       >
-        <span className="text-green-600 text-lg leading-none">+</span> Purchase
-        Empty Bottles/Buckets
+        <svg
+          className="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+          />
+        </svg>
+        Stock-In
       </button>
 
       {isOpen && (
@@ -51,7 +66,10 @@ export default function ContainerStockInModal({
                 Stock-In Bottles/Buckets
               </h2>
               <button
-                onClick={() => setIsOpen(false)}
+                onClick={() => {
+                  setIsOpen(false);
+                  setSelectedContainer(""); // Clear on close
+                }}
                 className="text-gray-500 hover:text-red-500 text-2xl leading-none font-bold"
               >
                 &times;
@@ -64,8 +82,16 @@ export default function ContainerStockInModal({
                   <label className="block text-sm font-bold text-gray-700 mb-1.5">
                     Select Bottles/Buckets
                   </label>
-                  <select className={glassInput} name="container_id" required>
-                    <option value="">- Select Bottle/Bucket -</option>
+                  <select
+                    className={glassInput}
+                    name="container_id"
+                    required
+                    value={selectedContainer}
+                    onChange={(e) => setSelectedContainer(e.target.value)} // <-- Track selection
+                  >
+                    <option value="" disabled>
+                      - Select Bottle/Bucket -
+                    </option>
                     {containers.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
@@ -86,6 +112,7 @@ export default function ContainerStockInModal({
                       min="1"
                       required
                       placeholder="0"
+                      disabled={!selectedContainer} // <-- Disabled until selected
                     />
                   </div>
                   <div>
@@ -100,6 +127,7 @@ export default function ContainerStockInModal({
                       min="0"
                       required
                       placeholder="0.00"
+                      disabled={!selectedContainer} // <-- Disabled until selected
                     />
                   </div>
                 </div>
@@ -114,22 +142,27 @@ export default function ContainerStockInModal({
                     name="supplier"
                     placeholder="e.g., Global Plastics Ltd."
                     required
+                    disabled={!selectedContainer} // <-- Disabled until selected
                   />
                 </div>
               </div>
 
+              {/* 🟦 UPDATED FOOTER BUTTONS (Blue Styling) */}
               <div className="px-6 py-4 border-t border-white/50 bg-white/40 flex gap-3 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="flex-1 py-2.5 px-4 border border-white/60 bg-white/50 rounded-xl text-sm font-bold text-gray-700 hover:bg-white/80 shadow-sm"
+                  onClick={() => {
+                    setIsOpen(false);
+                    setSelectedContainer("");
+                  }}
+                  className="flex-1 py-2.5 px-4 border border-white/60 bg-white/50 backdrop-blur-sm rounded-xl text-sm font-bold text-gray-700 hover:bg-white/80 transition-all shadow-sm"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="btn-primary flex-1 !rounded-xl shadow-lg shadow-[var(--lub-gold)]/20 disabled:opacity-50"
+                  disabled={isSubmitting || !selectedContainer} // <-- Checks both
+                  className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? "Processing..." : "Confirm Purchase"}
                 </button>

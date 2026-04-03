@@ -35,16 +35,16 @@ export async function deleteStickerAction(formData: FormData) {
   const id = formData.get("id") as string;
   const supabase = await createClient();
 
-  // 1. Clear transaction history
+  // 1. Delete all transaction history
   await supabase.from("material_transactions").delete().eq("material_id", id);
 
-  // 2. Clear production usage
+  // 2. Delete any production consumption records
   await supabase
     .from("production_material_consumption")
     .delete()
     .eq("raw_material_id", id);
 
-  // 3. Delete the Sticker
+  // 3. Force delete the Sticker
   const { error } = await supabase.from("materials").delete().eq("id", id);
 
   if (error) throw new Error(error.message);
@@ -54,20 +54,30 @@ export async function purchaseStickerAction(formData: FormData) {
   const material_id = formData.get("material_id") as string;
   const quantity = Number(formData.get("quantity"));
   const rate = Number(formData.get("rate"));
-  // Added the fallback here so it never crashes!
   const supplier = (formData.get("supplier") as string) || "Unknown Supplier";
   const total_cost = quantity * rate;
 
   const supabase = await createClient();
 
-  // 1. Fetch current sticker to get existing stock
+  // 1. Fetch current sticker to get existing stock AND average cost
   const { data: sticker, error: fetchError } = await supabase
     .from("materials")
-    .select("name, stock")
+    .select("name, stock, cost_per_unit") // <-- ADDED cost_per_unit
     .eq("id", material_id)
     .single();
 
   if (fetchError || !sticker) throw new Error("Sticker not found");
+
+  // 🌟 THE MOVING AVERAGE MATH 🌟
+  let currentStock = Number(sticker.stock || 0);
+  let currentAvgCost = Number(sticker.cost_per_unit || 0);
+
+  const currentTotalValue = currentStock * currentAvgCost;
+  const newPurchaseValue = quantity * rate;
+
+  const newStock = currentStock + quantity;
+  const newAvgCost =
+    newStock > 0 ? (currentTotalValue + newPurchaseValue) / newStock : 0;
 
   // 2. Log transaction
   const { error: stockError } = await supabase
@@ -82,17 +92,19 @@ export async function purchaseStickerAction(formData: FormData) {
 
   if (stockError) throw new Error("Failed to update stock");
 
-  // 3. Update ACTUAL stock
-  const newStock = Number(sticker.stock || 0) + quantity;
+  // 3. Update ACTUAL stock AND new average cost
   await supabase
     .from("materials")
-    .update({ stock: newStock })
+    .update({
+      stock: newStock,
+      cost_per_unit: newAvgCost, // <-- SAVING NEW BLENDED COST
+    })
     .eq("id", material_id);
 
-  // 4. Expense Entry (FIXED DATABASE TARGET)
+  // 4. Expense Entry
   const { error: accError } = await supabase.from("accounting_entries").insert({
-    entry_type: "Expense", // Changed to match your DB
-    amount: total_cost, // Removed the category line
+    entry_type: "Expense",
+    amount: total_cost,
     description: `Purchase - ${supplier} (${quantity} Stickers of ${sticker.name})`,
   });
 

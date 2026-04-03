@@ -115,13 +115,10 @@ export default async function RawMaterialsPage({
               <table className="erp-table w-full table-fixed min-w-[800px]">
                 <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
                   <tr>
-                    <th className="w-[45%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[55%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Material Name
                     </th>
-                    <th className="w-[20%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                      Unit
-                    </th>
-                    <th className="w-[20%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[30%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Current Stock
                     </th>
                     <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
@@ -139,15 +136,13 @@ export default async function RawMaterialsPage({
                         <td className="p-4 font-semibold text-gray-800 break-words">
                           {material.name}
                         </td>
-                        <td className="p-4 text-center">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-[10px] font-black uppercase">
-                            {material.unit}
-                          </span>
-                        </td>
                         <td
                           className={`p-4 text-center font-bold ${material.stock <= 0 ? "text-red-500" : "text-green-600"}`}
                         >
-                          {Number(material.stock).toFixed(2)}
+                          {Math.round(Number(material.stock))}{" "}
+                          <span className="text-xs font-normal text-gray-500">
+                            {material.unit}
+                          </span>
                         </td>
                         <td className="p-4 text-right">
                           <RowActions material={material} />
@@ -157,7 +152,7 @@ export default async function RawMaterialsPage({
                   ) : (
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={3}
                         className="text-center py-20 text-gray-400"
                       >
                         No materials found.
@@ -211,7 +206,7 @@ export default async function RawMaterialsPage({
                           {txn.materials?.name}
                         </td>
                         <td className="p-4 text-center font-bold text-green-600">
-                          +{Number(txn.quantity).toFixed(2)}{" "}
+                          +{Math.round(Number(txn.quantity))}{" "}
                           <span className="text-xs font-normal text-gray-400">
                             {txn.materials?.unit}
                           </span>

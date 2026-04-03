@@ -25,6 +25,9 @@ export default function AddContainerModal({
   const [selectedCap, setSelectedCap] = useState("");
   const [selectedSticker, setSelectedSticker] = useState("");
 
+  // --- ADDED THIS STATE TO FIX THE REACT ERROR ---
+  const [piecesPerBox, setPiecesPerBox] = useState<number | "">(1);
+
   // Helper function to block 'e', '+', '-' in number inputs
   const blockInvalidChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-"].includes(e.key)) {
@@ -45,6 +48,7 @@ export default function AddContainerModal({
     setSelectedBox("");
     setSelectedCap("");
     setSelectedSticker("");
+    setPiecesPerBox(1); // Reset this as well
     router.refresh();
   }
 
@@ -195,7 +199,13 @@ export default function AddContainerModal({
                               min="1"
                               required={!!selectedBox}
                               readOnly={!selectedBox}
-                              value={!selectedBox ? 1 : undefined}
+                              // --- REACT ERROR FIXED HERE ---
+                              value={!selectedBox ? 1 : piecesPerBox}
+                              onChange={(e) =>
+                                setPiecesPerBox(
+                                  e.target.value ? Number(e.target.value) : "",
+                                )
+                              }
                               onKeyDown={blockInvalidChars}
                             />
                           </div>
@@ -227,7 +237,7 @@ export default function AddContainerModal({
                             type="number"
                             name="cap_quantity"
                             min="1"
-                            defaultValue={1} // Defaults to 1 to save Mam time
+                            defaultValue={1} // Defaults to 1 to save time
                             disabled={!selectedCap}
                             onKeyDown={blockInvalidChars}
                           />
