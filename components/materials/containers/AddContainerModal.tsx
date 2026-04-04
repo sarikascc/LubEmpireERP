@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addContainerAction } from "@/app/actions/containers";
@@ -14,53 +15,80 @@ export default function AddContainerModal({
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // 🔥 NEW LOADING STATE
 
   // --- Toggle State for Bottle vs Bucket ---
   const [containerType, setContainerType] = useState<"bottle" | "bucket">(
     "bottle",
   );
 
-  // Track selections to show/hide quantity fields dynamically
   const [selectedBox, setSelectedBox] = useState("");
   const [selectedCap, setSelectedCap] = useState("");
   const [selectedSticker, setSelectedSticker] = useState("");
-
-  // --- ADDED THIS STATE TO FIX THE REACT ERROR ---
   const [piecesPerBox, setPiecesPerBox] = useState<number | "">(1);
 
-  // Helper function to block 'e', '+', '-' in number inputs
   const blockInvalidChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-"].includes(e.key)) {
       e.preventDefault();
     }
   };
 
-  async function handleSubmit(formData: FormData) {
-    // 🚨 IMPORTANT: Inject the current state of the toggle into the form data
-    // so the database knows if it is a Bottle or a Bucket!
+  // 🔥 CHANGED TO e.preventDefault() TO CONTROL THE LOADER
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const formData = new FormData(e.currentTarget);
     formData.append("type", containerType);
 
-    await addContainerAction(formData);
-    setIsOpen(false);
-
-    // Reset form states
-    setContainerType("bottle");
-    setSelectedBox("");
-    setSelectedCap("");
-    setSelectedSticker("");
-    setPiecesPerBox(1); // Reset this as well
-    router.refresh();
+    try {
+      await addContainerAction(formData);
+      setIsOpen(false);
+      setContainerType("bottle");
+      setSelectedBox("");
+      setSelectedCap("");
+      setSelectedSticker("");
+      setPiecesPerBox(1);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to add container.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
+  // --- STYLES FOR THE GLASSY MODAL UI ---
   const glassBackdrop =
     "fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[60] p-4 text-left";
   const glassModal =
-    "bg-white/70 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden";
+    "bg-[#f4f5f7]/95 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-3xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden";
   const glassInput =
-    "input-field !bg-white/50 !border-white/60 focus:!bg-white/90 focus:!border-[var(--lub-gold)] shadow-sm";
+    "w-full p-3 bg-white border border-gray-100 shadow-sm rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--lub-gold)]/50 transition-all";
+  const labelClass =
+    "block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide";
 
-  // Unified Label Class
-  const labelClass = "block text-sm font-bold text-gray-700 mb-1.5";
+  const Spinner = () => (
+    <svg
+      className="w-5 h-5 animate-spin text-white"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      ></circle>
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      ></path>
+    </svg>
+  );
 
   return (
     <>
@@ -72,34 +100,37 @@ export default function AddContainerModal({
       </button>
 
       {isOpen && (
-        <div className={glassBackdrop}>
-          <div className={glassModal}>
-            <div className="px-6 py-4 border-b border-white/50 bg-white/40 flex justify-between items-center shrink-0">
-              <h2 className="text-lg font-bold text-[var(--lub-dark)]">
+        <div
+          className={glassBackdrop}
+          onClick={() => !isSubmitting && setIsOpen(false)}
+        >
+          <div className={glassModal} onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 flex justify-between items-center border-b border-gray-200/50 shrink-0">
+              <h2 className="text-[15px] font-extrabold text-[#334155]">
                 Add Bottles/Buckets Configuration
               </h2>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-gray-500 hover:text-red-500 text-2xl leading-none font-bold"
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl leading-none focus:outline-none"
               >
                 &times;
               </button>
             </div>
 
             <form
-              action={handleSubmit}
+              onSubmit={handleSubmit}
               className="flex flex-col flex-1 min-h-0"
             >
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6 text-left">
                 {/* --- TOGGLE SWITCH --- */}
                 <div className="flex justify-center mb-2">
-                  <div className="flex bg-gray-100 p-1 rounded-xl w-full max-w-md border border-gray-200">
+                  <div className="flex bg-gray-200/60 p-1.5 rounded-xl w-full max-w-md border border-gray-200 shadow-inner">
                     <button
                       type="button"
                       onClick={() => setContainerType("bottle")}
                       className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
                         containerType === "bottle"
-                          ? "bg-white text-[var(--lub-dark)] shadow-sm border border-gray-200"
+                          ? "bg-white text-[#334155] shadow-sm border border-gray-200"
                           : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
@@ -109,12 +140,12 @@ export default function AddContainerModal({
                       type="button"
                       onClick={() => {
                         setContainerType("bucket");
-                        setSelectedBox(""); // Clear box selection
-                        setSelectedCap(""); // Clear cap selection
+                        setSelectedBox("");
+                        setSelectedCap("");
                       }}
                       className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
                         containerType === "bucket"
-                          ? "bg-white text-[var(--lub-dark)] shadow-sm border border-gray-200"
+                          ? "bg-white text-[#334155] shadow-sm border border-gray-200"
                           : "text-gray-500 hover:text-gray-700"
                       }`}
                     >
@@ -126,17 +157,16 @@ export default function AddContainerModal({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* --- 1. BASIC DETAILS --- */}
                   <div className="md:col-span-2">
-                    <label className={labelClass}>
-                      Bottles/Buckets Name (e.g.,{" "}
-                      {containerType === "bottle"
-                        ? "1L Gold Bottle"
-                        : "25L Red Bucket"}
-                      )
-                    </label>
+                    <label className={labelClass}>Bottles/Buckets Name</label>
                     <input
                       className={glassInput}
                       type="text"
                       name="name"
+                      placeholder={
+                        containerType === "bottle"
+                          ? "e.g., 1L Gold Bottle"
+                          : "e.g., 25L Red Bucket"
+                      }
                       required
                     />
                   </div>
@@ -154,7 +184,7 @@ export default function AddContainerModal({
                         required
                       />
                       <select
-                        className={`${glassInput} !w-24 shrink-0`}
+                        className={`${glassInput} !w-28 shrink-0`}
                         name="capacity_unit"
                         required
                       >
@@ -170,10 +200,13 @@ export default function AddContainerModal({
                   {containerType === "bottle" && (
                     <>
                       {/* --- 2. MASTER BOX --- */}
-                      <div className="md:col-span-2 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+                      <div className="md:col-span-2 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
+                        <h3 className="text-sm font-extrabold text-gray-700 mb-4 border-b border-gray-100 pb-2">
+                          Master Box Configuration
+                        </h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           <div className="md:col-span-2">
-                            <label className={labelClass}>Box</label>
+                            <label className={labelClass}>Select Box</label>
                             <select
                               className={`${glassInput} w-full`}
                               name="box_id"
@@ -199,7 +232,6 @@ export default function AddContainerModal({
                               min="1"
                               required={!!selectedBox}
                               readOnly={!selectedBox}
-                              // --- REACT ERROR FIXED HERE ---
                               value={!selectedBox ? 1 : piecesPerBox}
                               onChange={(e) =>
                                 setPiecesPerBox(
@@ -213,9 +245,9 @@ export default function AddContainerModal({
                       </div>
 
                       {/* --- 3. CAP --- */}
-                      <div className="md:col-span-2 flex items-start gap-4 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+                      <div className="md:col-span-2 flex items-start gap-4 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
                         <div className="flex-1">
-                          <label className={labelClass}>Cap</label>
+                          <label className={labelClass}>Bottle Cap</label>
                           <select
                             className={`${glassInput} w-full`}
                             name="cap_id"
@@ -237,7 +269,7 @@ export default function AddContainerModal({
                             type="number"
                             name="cap_quantity"
                             min="1"
-                            defaultValue={1} // Defaults to 1 to save time
+                            defaultValue={1}
                             disabled={!selectedCap}
                             onKeyDown={blockInvalidChars}
                           />
@@ -247,10 +279,10 @@ export default function AddContainerModal({
                   )}
 
                   {/* --- 4. STICKER (MANDATORY FOR BOTH) --- */}
-                  <div className="md:col-span-2 flex items-start gap-4 p-4 bg-gray-50/50 rounded-xl border border-gray-100">
+                  <div className="md:col-span-2 flex items-start gap-4 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
                     <div className="flex-1">
                       <label className={labelClass}>
-                        Sticker / Label (Required)
+                        Sticker / Label <span className="text-red-500">*</span>
                       </label>
                       <select
                         className={`${glassInput} w-full`}
@@ -274,7 +306,7 @@ export default function AddContainerModal({
                         type="number"
                         name="sticker_quantity"
                         min="1"
-                        defaultValue={1} // Defaults to 1
+                        defaultValue={1}
                         required
                         onKeyDown={blockInvalidChars}
                       />
@@ -283,19 +315,27 @@ export default function AddContainerModal({
                 </div>
               </div>
 
-              <div className="px-6 py-4 border-t border-white/50 bg-white/40 flex gap-3 shrink-0">
+              <div className="px-6 py-4 border-t border-gray-200/50 bg-gray-50 flex gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="flex-1 py-2.5 px-4 border border-white/60 bg-white/50 rounded-xl text-sm font-bold text-gray-700 hover:bg-white/80 transition-all shadow-sm"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 px-4 bg-white text-gray-700 font-bold rounded-xl shadow-sm border border-gray-200 hover:bg-gray-50 transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn-primary flex-1 !rounded-xl shadow-lg shadow-[var(--lub-gold)]/20"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 px-4 bg-[var(--lub-gold)] text-white font-bold rounded-xl shadow-md hover:brightness-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
                 >
-                  Save Container
+                  {isSubmitting ? (
+                    <>
+                      <Spinner /> Saving...
+                    </>
+                  ) : (
+                    "Save Container"
+                  )}
                 </button>
               </div>
             </form>

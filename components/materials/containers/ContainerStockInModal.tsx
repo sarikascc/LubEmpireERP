@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { purchaseContainerAction } from "@/app/actions/containers";
@@ -11,14 +12,18 @@ export default function ContainerStockInModal({
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedContainer, setSelectedContainer] = useState(""); // <-- Added state to match Cap modal
+  const [selectedContainer, setSelectedContainer] = useState("");
 
-  async function handleSubmit(formData: FormData) {
+  // 🔥 CHANGED TO e.preventDefault() TO CONTROL THE LOADER
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setIsSubmitting(true);
+
+    const formData = new FormData(e.currentTarget);
     try {
       await purchaseContainerAction(formData);
       setIsOpen(false);
-      setSelectedContainer(""); // <-- Reset on success
+      setSelectedContainer("");
       router.refresh();
     } catch (error) {
       console.error(error);
@@ -28,16 +33,38 @@ export default function ContainerStockInModal({
     }
   }
 
+  // --- STYLES FOR THE GLASSY MODAL UI ---
   const glassBackdrop =
     "fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[60] p-4 text-left";
   const glassModal =
-    "bg-white/70 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-2xl w-full max-w-md flex flex-col overflow-hidden";
+    "bg-[#f4f5f7]/95 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-3xl w-full max-w-md flex flex-col overflow-hidden";
   const glassInput =
-    "input-field !bg-white/50 !border-white/60 focus:!bg-white/90 focus:!border-[var(--lub-gold)] shadow-sm";
+    "w-full p-3 bg-white border border-gray-100 shadow-sm rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all";
+
+  const Spinner = () => (
+    <svg
+      className="w-5 h-5 animate-spin text-white"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      ></circle>
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      ></path>
+    </svg>
+  );
 
   return (
     <>
-      {/* 🟦 UPDATED TRIGGER BUTTON (Blue with SVG) */}
       <button
         onClick={() => setIsOpen(true)}
         className="h-[38px] px-4 bg-[var(--lub-blue)] hover:bg-[#2e376b] text-white text-sm font-bold rounded-md transition-colors shadow-sm shrink-0 flex items-center justify-center gap-2"
@@ -59,27 +86,30 @@ export default function ContainerStockInModal({
       </button>
 
       {isOpen && (
-        <div className={glassBackdrop}>
-          <div className={glassModal}>
-            <div className="px-6 py-4 border-b border-white/50 bg-white/40 flex justify-between items-center shrink-0">
-              <h2 className="text-lg font-bold text-[var(--lub-dark)]">
+        <div
+          className={glassBackdrop}
+          onClick={() => !isSubmitting && setIsOpen(false)}
+        >
+          <div className={glassModal} onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 flex justify-between items-center border-b border-gray-200/50 shrink-0">
+              <h2 className="text-[15px] font-extrabold text-[#334155]">
                 Stock-In Bottles/Buckets
               </h2>
               <button
                 onClick={() => {
                   setIsOpen(false);
-                  setSelectedContainer(""); // Clear on close
+                  setSelectedContainer("");
                 }}
-                className="text-gray-500 hover:text-red-500 text-2xl leading-none font-bold"
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl leading-none focus:outline-none"
               >
                 &times;
               </button>
             </div>
 
-            <form action={handleSubmit} className="flex flex-col">
-              <div className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="flex flex-col">
+              <div className="p-6 space-y-5">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
                     Select Bottles/Buckets
                   </label>
                   <select
@@ -87,7 +117,7 @@ export default function ContainerStockInModal({
                     name="container_id"
                     required
                     value={selectedContainer}
-                    onChange={(e) => setSelectedContainer(e.target.value)} // <-- Track selection
+                    onChange={(e) => setSelectedContainer(e.target.value)}
                   >
                     <option value="" disabled>
                       - Select Bottle/Bucket -
@@ -102,7 +132,7 @@ export default function ContainerStockInModal({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
                       Quantity (PCS)
                     </label>
                     <input
@@ -112,11 +142,11 @@ export default function ContainerStockInModal({
                       min="1"
                       required
                       placeholder="0"
-                      disabled={!selectedContainer} // <-- Disabled until selected
+                      disabled={!selectedContainer}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
                       Rate per PC (₹)
                     </label>
                     <input
@@ -127,13 +157,13 @@ export default function ContainerStockInModal({
                       min="0"
                       required
                       placeholder="0.00"
-                      disabled={!selectedContainer} // <-- Disabled until selected
+                      disabled={!selectedContainer}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
                     Supplier / Reason
                   </label>
                   <input
@@ -142,29 +172,35 @@ export default function ContainerStockInModal({
                     name="supplier"
                     placeholder="e.g., Global Plastics Ltd."
                     required
-                    disabled={!selectedContainer} // <-- Disabled until selected
+                    disabled={!selectedContainer}
                   />
                 </div>
               </div>
 
-              {/* 🟦 UPDATED FOOTER BUTTONS (Blue Styling) */}
-              <div className="px-6 py-4 border-t border-white/50 bg-white/40 flex gap-3 shrink-0">
+              <div className="px-6 py-4 border-t border-gray-200/50 bg-gray-50 flex gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setIsOpen(false);
                     setSelectedContainer("");
                   }}
-                  className="flex-1 py-2.5 px-4 border border-white/60 bg-white/50 backdrop-blur-sm rounded-xl text-sm font-bold text-gray-700 hover:bg-white/80 transition-all shadow-sm"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 px-4 bg-white text-gray-700 font-bold rounded-xl shadow-sm border border-gray-200 hover:bg-gray-50 transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !selectedContainer} // <-- Checks both
-                  className="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isSubmitting || !selectedContainer}
+                  className="flex-1 py-3 px-4 bg-blue-600 text-white font-bold rounded-xl shadow-md hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting ? "Processing..." : "Confirm Purchase"}
+                  {isSubmitting ? (
+                    <>
+                      <Spinner /> Logging...
+                    </>
+                  ) : (
+                    "Confirm Purchase"
+                  )}
                 </button>
               </div>
             </form>

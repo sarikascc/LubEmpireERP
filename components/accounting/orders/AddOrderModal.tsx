@@ -95,10 +95,12 @@ export default function AddOrderModal({
     if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
   };
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setIsSubmitting(true);
     setErrorMsg("");
 
+    const formData = new FormData(e.currentTarget);
     try {
       const response = await createOrderAction(formData);
 
@@ -122,13 +124,37 @@ export default function AddOrderModal({
     }
   }
 
+  // --- STYLES FOR THE GLASSY MODAL UI ---
   const glassBackdrop =
     "fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[60] p-4 text-left";
   const glassModal =
-    "bg-white/70 backdrop-blur-xl border border-white/60 shadow-sm rounded-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden";
+    "bg-[#f4f5f7]/95 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-3xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden";
   const glassInput =
-    "w-full p-2.5 bg-white/50 border border-white/60 rounded-xl text-sm focus:bg-white focus:border-[var(--lub-gold)] outline-none transition-all shadow-sm";
-  const labelClass = "block text-sm font-bold text-gray-700 mb-1.5";
+    "w-full p-3 bg-white border border-gray-100 shadow-sm rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--lub-gold)]/50 transition-all";
+  const labelClass =
+    "block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide";
+
+  const Spinner = () => (
+    <svg
+      className="w-5 h-5 animate-spin text-white"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      ></circle>
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      ></path>
+    </svg>
+  );
 
   return (
     <>
@@ -143,27 +169,30 @@ export default function AddOrderModal({
       </button>
 
       {isOpen && (
-        <div className={glassBackdrop}>
-          <div className={glassModal}>
-            <div className="px-6 py-4 border-b border-white/50 bg-white/40 flex justify-between items-center shrink-0">
-              <h2 className="text-lg font-bold text-[var(--lub-dark)]">
+        <div
+          className={glassBackdrop}
+          onClick={() => !isSubmitting && setIsOpen(false)}
+        >
+          <div className={glassModal} onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 flex justify-between items-center border-b border-gray-200/50 shrink-0">
+              <h2 className="text-[15px] font-extrabold text-[#334155]">
                 Create New Sales Order
               </h2>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-gray-500 hover:text-red-500 text-2xl leading-none font-bold"
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl leading-none focus:outline-none"
               >
                 &times;
               </button>
             </div>
 
             <form
-              action={handleSubmit}
+              onSubmit={handleSubmit}
               className="flex flex-col flex-1 min-h-0"
             >
-              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {errorMsg && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600 font-medium">
+                  <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-sm font-bold rounded-2xl shadow-sm">
                     ⚠️ {errorMsg}
                   </div>
                 )}
@@ -189,7 +218,9 @@ export default function AddOrderModal({
                       value={selectedProductId}
                       onChange={(e) => setSelectedProductId(e.target.value)}
                     >
-                      <option value="">-- Select Product --</option>
+                      <option value="" disabled>
+                        -- Select Product --
+                      </option>
                       {finishedProducts.map((fp) => (
                         <option key={fp.id} value={fp.id}>
                           {fp.product_name} ({fp.grade_name}) -{" "}
@@ -211,10 +242,16 @@ export default function AddOrderModal({
                       value={selectedContainerId}
                       onChange={(e) => setSelectedContainerId(e.target.value)}
                     >
-                      <option value="">-- Select Packaging --</option>
+                      <option value="" disabled>
+                        -- Select Packaging --
+                      </option>
                       {containers.map((c) => (
                         <option key={c.id} value={c.id}>
-                          {c.name}
+                          {/* 🔥 NEW: Added Capacity and Unit directly to the dropdown label */}
+                          {c.name}{" "}
+                          {c.capacity_per_piece
+                            ? `- ${c.capacity_per_piece}${c.capacity_unit}`
+                            : ""}
                         </option>
                       ))}
                     </select>
@@ -248,7 +285,7 @@ export default function AddOrderModal({
                       min="0.01"
                       required
                       onKeyDown={blockInvalidChars}
-                      placeholder="e.g., 1500.00"
+                      placeholder="e.g., 150.00"
                       className={glassInput}
                       value={rate}
                       onChange={(e) =>
@@ -258,17 +295,17 @@ export default function AddOrderModal({
                   </div>
                 </div>
 
-                {/* 🔥 NEW: AMOUNT & PROFIT DISPLAY 🔥 */}
+                {/* 🔥 MAGIC GREEN PROFIT BOX 🔥 */}
                 {selectedProductId &&
                 selectedContainerId &&
                 boxesQty &&
                 rate ? (
-                  <div className="mt-2 p-4 bg-green-50 border border-green-200 rounded-xl flex flex-col gap-3 shadow-inner">
+                  <div className="mt-4 p-5 bg-green-50 border border-green-200 rounded-2xl flex flex-col gap-3 shadow-inner">
                     <div className="flex justify-between items-center border-b border-green-200/60 pb-3">
-                      <span className="font-bold text-green-800">
-                        Total Sale Amount:
+                      <span className="font-extrabold text-green-800 text-sm uppercase tracking-wide">
+                        Total Sale Amount
                       </span>
-                      <span className="font-black text-lg text-green-900">
+                      <span className="font-black text-xl text-green-900">
                         ₹
                         {finalAmount.toLocaleString("en-IN", {
                           minimumFractionDigits: 2,
@@ -277,11 +314,11 @@ export default function AddOrderModal({
                       </span>
                     </div>
                     <div className="flex justify-between items-center pt-1">
-                      <span className="font-bold text-green-900">
-                        Estimated Net Profit:
+                      <span className="font-extrabold text-green-900 text-sm uppercase tracking-wide">
+                        Estimated Net Profit
                       </span>
                       <span
-                        className={`font-black text-xl tracking-tight ${estimatedProfit >= 0 ? "text-green-700" : "text-red-600"}`}
+                        className={`font-black text-2xl tracking-tight ${estimatedProfit >= 0 ? "text-green-700" : "text-red-600"}`}
                       >
                         ₹
                         {estimatedProfit.toLocaleString("en-IN", {
@@ -294,11 +331,12 @@ export default function AddOrderModal({
                 ) : null}
               </div>
 
-              <div className="px-6 py-4 border-t border-white/50 bg-white/40 flex gap-3 shrink-0">
+              <div className="px-6 py-4 border-t border-gray-200/50 bg-gray-50 flex gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="flex-1 py-2.5 px-4 border border-white/60 bg-white/50 rounded-xl text-sm font-bold text-gray-700 hover:bg-white/80 transition-all shadow-sm"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 px-4 bg-white text-gray-700 font-bold rounded-xl shadow-sm border border-gray-200 hover:bg-gray-50 transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -310,9 +348,15 @@ export default function AddOrderModal({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="btn-primary flex-1 !rounded-xl shadow-lg shadow-[var(--lub-gold)]/20 disabled:opacity-50"
+                  className="flex-1 py-3 px-4 bg-[var(--lub-gold)] text-white font-bold rounded-xl shadow-md hover:brightness-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
                 >
-                  {isSubmitting ? "Processing..." : "Confirm Order"}
+                  {isSubmitting ? (
+                    <>
+                      <Spinner /> Processing...
+                    </>
+                  ) : (
+                    "Confirm Order"
+                  )}
                 </button>
               </div>
             </form>

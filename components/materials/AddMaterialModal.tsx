@@ -7,13 +7,55 @@ import { addRawMaterial } from "@/app/actions/materials";
 export default function AddMaterialModal() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // 🔥 NEW LOADING STATE
 
-  // Wrapper function to close the modal and refresh the page after submitting
-  async function handleSubmit(formData: FormData) {
-    await addRawMaterial(formData);
-    setIsOpen(false);
-    router.refresh(); // Instantly fetch the new list of materials
+  // 🔥 CHANGED TO e.preventDefault() TO CONTROL THE LOADER
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const formData = new FormData(e.currentTarget);
+    try {
+      await addRawMaterial(formData);
+      setIsOpen(false);
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to add material.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
+
+  // --- STYLES FOR THE GLASSY MODAL UI ---
+  const glassBackdrop =
+    "fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[60] p-4 text-left";
+  const glassModal =
+    "bg-[#f4f5f7]/95 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-3xl w-full max-w-md flex flex-col overflow-hidden";
+  const glassInput =
+    "w-full p-3 bg-white border border-gray-100 shadow-sm rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--lub-gold)]/50 transition-all";
+
+  const Spinner = () => (
+    <svg
+      className="w-5 h-5 animate-spin text-white"
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      ></circle>
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      ></path>
+    </svg>
+  );
 
   return (
     <>
@@ -26,27 +68,30 @@ export default function AddMaterialModal() {
 
       {/* The Popup Modal */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-              <h2 className="text-lg font-bold text-[var(--lub-dark)]">
+        <div
+          className={glassBackdrop}
+          onClick={() => !isSubmitting && setIsOpen(false)}
+        >
+          <div className={glassModal} onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-5 flex justify-between items-center border-b border-gray-200/50">
+              <h2 className="text-[15px] font-extrabold text-[#334155]">
                 Add Raw Material
               </h2>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-gray-400 hover:text-red-500 text-2xl leading-none font-bold"
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl leading-none focus:outline-none"
               >
                 &times;
               </button>
             </div>
 
-            <form action={handleSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
               <div>
-                <label className="block text-sm font-semibold text-[var(--lub-text)] mb-1.5">
+                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
                   Material Name
                 </label>
                 <input
-                  className="input-field"
+                  className={glassInput}
                   type="text"
                   name="name"
                   placeholder="e.g., Base Oil SN 150"
@@ -55,25 +100,36 @@ export default function AddMaterialModal() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-[var(--lub-text)] mb-1.5">
+                <label className="block text-xs font-bold text-gray-600 mb-1.5 uppercase tracking-wide">
                   Measurement Unit
                 </label>
-                <select className="input-field bg-white" name="unit" required>
+                <select className={glassInput} name="unit" required>
                   <option value="Ltr">Liter (Ltr.)</option>
                   <option value="KG">Kilogram (KG)</option>
                 </select>
               </div>
 
-              <div className="pt-2 flex gap-3">
+              <div className="pt-3 flex gap-3">
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="flex-1 py-2.5 px-4 border border-gray-200 rounded-md text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 px-4 bg-white text-gray-700 font-bold rounded-xl shadow-sm border border-gray-200 hover:bg-gray-50 transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary flex-1">
-                  Save Material
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 px-4 bg-[var(--lub-gold)] text-white font-bold rounded-xl shadow-md hover:brightness-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Spinner /> Saving...
+                    </>
+                  ) : (
+                    "Save Material"
+                  )}
                 </button>
               </div>
             </form>
