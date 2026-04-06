@@ -104,7 +104,6 @@ export default async function OrdersPage({
           <table className="erp-table w-full table-fixed min-w-[1000px]">
             <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
               <tr>
-                {/* Adjusted widths to fit the new column */}
                 <th className="w-[16%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Order Number
                 </th>
@@ -120,12 +119,15 @@ export default async function OrdersPage({
                 <th className="w-[8%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Qty
                 </th>
-                {/* 🔥 NEW RATE COLUMN HEADER */}
                 <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Rate
                 </th>
                 <th className="w-[12%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Total Amount
+                </th>
+                {/* 🔥 PROFIT COLUMN HEADER */}
+                <th className="w-[12%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Est. Profit
                 </th>
                 <th className="w-[8%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Actions
@@ -141,6 +143,10 @@ export default async function OrdersPage({
                   const dd = String(dateObj.getDate()).padStart(2, "0");
                   const paddedNum = String(order.order_number).padStart(4, "0");
                   const formattedOrderId = `ORD-${yyyy}${mm}${dd}-${paddedNum}`;
+
+                  // Determine if total amount and profit are negative to display properly
+                  const isTotalNegative = Number(order.total_amount) < 0;
+                  const isProfitNegative = Number(order.calculated_profit) < 0;
 
                   return (
                     <tr
@@ -186,7 +192,6 @@ export default async function OrdersPage({
                         </div>
                       </td>
 
-                      {/* 🔥 NEW RATE COLUMN DATA */}
                       <td className="p-4 text-right">
                         <div className="font-semibold text-gray-700">
                           ₹
@@ -203,11 +208,32 @@ export default async function OrdersPage({
                         </div>
                       </td>
 
-                      {/* CLEANED UP TOTAL AMOUNT COLUMN */}
+                      {/* 🔥 TOTAL AMOUNT COLUMN (FORMATTED SIGN) */}
                       <td className="p-4 text-right">
-                        <div className="font-black text-green-600">
-                          ₹
-                          {Number(order.total_amount).toLocaleString("en-IN", {
+                        <div
+                          className={`font-black tracking-tight ${isTotalNegative ? "text-red-600" : "text-green-600"}`}
+                        >
+                          {isTotalNegative ? "- ₹" : "₹"}
+                          {Math.abs(Number(order.total_amount)).toLocaleString(
+                            "en-IN",
+                            {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            },
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 🔥 PROFIT COLUMN (FORMATTED SIGN) */}
+                      <td className="p-4 text-right">
+                        <div
+                          className={`font-black tracking-tight ${isProfitNegative ? "text-red-600" : "text-green-600"}`}
+                        >
+                          {isProfitNegative ? "- ₹" : "₹"}
+                          {Math.abs(
+                            Number(order.calculated_profit || 0),
+                          ).toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </div>
@@ -221,9 +247,8 @@ export default async function OrdersPage({
                 })
               ) : (
                 <tr>
-                  {/* Updated colSpan from 7 to 8 to account for the new column */}
                   <td
-                    colSpan={8}
+                    colSpan={9} // 🔥 Updated to 9 because we added the Profit column
                     className="text-center py-20 text-gray-400 font-medium"
                   >
                     No sales orders found matching your filters.
