@@ -3,38 +3,71 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
-// 1. CREATE NEW CONTAINER & RECIPE
+// 1. CREATE NEW CONTAINER & RECIPE (UPDATED FOR VARIANT MODE)
 export async function addContainerAction(formData: FormData) {
   const name = formData.get("name") as string;
   const capacity_per_piece = Number(formData.get("capacity_per_piece"));
   const capacity_unit = formData.get("capacity_unit") as string;
-
-  // ---> NEW: Extract type from formData
   const type = formData.get("type") as string;
 
-  // Box (Optional)
-  const box_id = formData.get("box_id") as string;
-  const pieces_per_box = Number(formData.get("pieces_per_box")) || 1;
-
-  // Cap (Optional)
-  const cap_id = formData.get("cap_id") as string;
-  const cap_quantity = Number(formData.get("cap_quantity")) || 0;
-
-  // Sticker (Mandatory)
-  const sticker_id = formData.get("sticker_id") as string;
-  const sticker_quantity = Number(formData.get("sticker_quantity")) || 1;
+  // ---> NEW: Extract Variant Mode flags
+  const creation_mode = formData.get("creation_mode") as string;
+  const base_container_id = formData.get("base_container_id") as string;
 
   const supabase = await createClient();
 
+  // Initialize variables to hold the final accessory configuration
+  let box_id: string | null = null;
+  let pieces_per_box = 1;
+  let cap_id: string | null = null;
+  let cap_quantity = 0;
+  let sticker_id: string | null = null;
+  let sticker_quantity = 1;
+
+  // 🔥 MAGIC: IF IT IS A VARIANT, COPY FROM THE BASE CONTAINER 🔥
+  if (creation_mode === "variant") {
+    if (!base_container_id)
+      throw new Error("Base container is required for variant mode.");
+
+    const { data: baseContainer, error: fetchError } = await supabase
+      .from("containers")
+      .select(
+        "box_id, pieces_per_box, cap_id, cap_quantity, sticker_id, sticker_quantity",
+      )
+      .eq("id", base_container_id)
+      .single();
+
+    if (fetchError || !baseContainer) {
+      throw new Error("Could not fetch the base container configuration.");
+    }
+
+    // Apply the copied configuration
+    box_id = baseContainer.box_id;
+    pieces_per_box = baseContainer.pieces_per_box || 1;
+    cap_id = baseContainer.cap_id;
+    cap_quantity = baseContainer.cap_quantity || 0;
+    sticker_id = baseContainer.sticker_id;
+    sticker_quantity = baseContainer.sticker_quantity || 1;
+  } else {
+    // 🔥 STANDARD MODE: Extract directly from form data 🔥
+    box_id = (formData.get("box_id") as string) || null;
+    pieces_per_box = Number(formData.get("pieces_per_box")) || 1;
+    cap_id = (formData.get("cap_id") as string) || null;
+    cap_quantity = Number(formData.get("cap_quantity")) || 0;
+    sticker_id = (formData.get("sticker_id") as string) || null;
+    sticker_quantity = Number(formData.get("sticker_quantity")) || 1;
+  }
+
+  // Insert the new container/variant into the database
   const { error } = await supabase.from("containers").insert({
     name,
-    type, // ---> NEW: Save type to DB
+    type,
     stock: 0, // Starts at 0 when you first create it
     capacity_per_piece,
     capacity_unit,
     pieces_per_box,
-    box_id: box_id || null,
-    cap_id: cap_id || null,
+    box_id,
+    cap_id,
     cap_quantity,
     sticker_id,
     sticker_quantity,
@@ -54,7 +87,6 @@ export async function editContainerAction(formData: FormData) {
   const capacity_per_piece = Number(formData.get("capacity_per_piece"));
   const capacity_unit = formData.get("capacity_unit") as string;
 
-  // ---> NEW: Extract type from formData
   const type = formData.get("type") as string;
 
   const box_id = formData.get("box_id") as string;
@@ -72,7 +104,7 @@ export async function editContainerAction(formData: FormData) {
     .from("containers")
     .update({
       name,
-      type, // ---> NEW: Update type in DB
+      type,
       capacity_per_piece,
       capacity_unit,
       pieces_per_box,
@@ -116,7 +148,7 @@ export async function purchaseContainerAction(formData: FormData) {
   // 1. Fetch current stock and cost
   const { data: container, error: fetchError } = await supabase
     .from("containers")
-    .select("name, stock, cost_per_piece") // <-- ADDED cost_per_piece
+    .select("name, stock, cost_per_piece")
     .eq("id", container_id)
     .single();
 

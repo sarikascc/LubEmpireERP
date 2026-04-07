@@ -19,7 +19,7 @@ export default async function ContainersPage({
   const currentPage = Number(resolvedParams.page) || 1;
   const search = resolvedParams.search || "";
   const tab = resolvedParams.tab || "containers";
-  const typeFilter = resolvedParams.typeFilter || "all"; // <-- 2. EXTRACT TYPE FILTER
+  const typeFilter = resolvedParams.typeFilter || "all";
   const pageSize = 20;
 
   const from = (currentPage - 1) * pageSize;
@@ -72,9 +72,10 @@ export default async function ContainersPage({
   const stickers = safeMaterials.filter((m) => m.type === "Sticker");
   const caps = safeMaterials.filter((m) => m.type === "Cap");
 
+  // 🔥 FETCHING EXISTING CONTAINERS FOR THE VARIANT MODE 🔥
   const { data: allContainers } = await supabase
     .from("containers")
-    .select("id, name")
+    .select("id, name, type, capacity_per_piece, capacity_unit")
     .order("name");
 
   const safeAllContainers = allContainers || [];
@@ -89,7 +90,7 @@ export default async function ContainersPage({
     params.set("page", newPage.toString());
     params.set("tab", tab);
     if (search) params.set("search", search);
-    if (typeFilter !== "all") params.set("typeFilter", typeFilter); // <-- 4. KEEP FILTER ON PAGINATION
+    if (typeFilter !== "all") params.set("typeFilter", typeFilter);
     return `?${params.toString()}`;
   };
 
@@ -130,6 +131,7 @@ export default async function ContainersPage({
                   boxes={boxes}
                   stickers={stickers}
                   caps={caps}
+                  existingContainers={safeAllContainers} // 🔥 PASSED THE EXISTING CONTAINERS PROP HERE
                 />
               </div>
             </div>

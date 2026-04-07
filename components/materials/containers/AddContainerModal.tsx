@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { addContainerAction } from "@/app/actions/containers";
 
@@ -8,24 +8,49 @@ export default function AddContainerModal({
   boxes,
   stickers,
   caps,
+  existingContainers,
 }: {
   boxes: { id: string; name: string }[];
   stickers: { id: string; name: string }[];
   caps: { id: string; name: string }[];
+  existingContainers?: {
+    id: string;
+    name: string;
+    capacity_per_piece: number;
+    capacity_unit: string;
+    type?: string; // Type might be optional for older legacy database entries
+  }[];
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false); // 🔥 NEW LOADING STATE
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- Toggle State for Bottle vs Bucket ---
+  // --- Toggle States ---
   const [containerType, setContainerType] = useState<"bottle" | "bucket">(
     "bottle",
   );
+  const [creationMode, setCreationMode] = useState<"custom" | "variant">(
+    "custom",
+  );
 
+  const [selectedBaseContainer, setSelectedBaseContainer] = useState("");
   const [selectedBox, setSelectedBox] = useState("");
   const [selectedCap, setSelectedCap] = useState("");
   const [selectedSticker, setSelectedSticker] = useState("");
   const [piecesPerBox, setPiecesPerBox] = useState<number | "">(1);
+
+  // 🔥 BULLETPROOF FILTERING: Strictly separate Bottles and Buckets
+  const filteredExistingContainers =
+    existingContainers?.filter((c) => {
+      // If an old container doesn't have a type yet, assume it's a bottle to prevent it from vanishing
+      const dbType = (c.type || "bottle").toLowerCase();
+      return dbType === containerType;
+    }) || [];
+
+  // Reset the base container selection whenever the user switches between Bottle/Bucket
+  useEffect(() => {
+    setSelectedBaseContainer("");
+  }, [containerType]);
 
   const blockInvalidChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-"].includes(e.key)) {
@@ -33,22 +58,27 @@ export default function AddContainerModal({
     }
   };
 
-  // 🔥 CHANGED TO e.preventDefault() TO CONTROL THE LOADER
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsSubmitting(true);
 
     const formData = new FormData(e.currentTarget);
     formData.append("type", containerType);
+    formData.append("creation_mode", creationMode);
 
     try {
       await addContainerAction(formData);
       setIsOpen(false);
+
+      // Reset form states
       setContainerType("bottle");
+      setCreationMode("custom");
+      setSelectedBaseContainer("");
       setSelectedBox("");
       setSelectedCap("");
       setSelectedSticker("");
       setPiecesPerBox(1);
+
       router.refresh();
     } catch (error) {
       console.error(error);
@@ -107,7 +137,8 @@ export default function AddContainerModal({
           <div className={glassModal} onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-5 flex justify-between items-center border-b border-gray-200/50 shrink-0">
               <h2 className="text-[15px] font-extrabold text-[#334155]">
-                Add Bottles/Buckets Configuration
+                Add {containerType === "bottle" ? "Bottle" : "Bucket"}{" "}
+                Configuration
               </h2>
               <button
                 onClick={() => setIsOpen(false)}
@@ -122,57 +153,144 @@ export default function AddContainerModal({
               className="flex flex-col flex-1 min-h-0"
             >
               <div className="flex-1 overflow-y-auto p-6 space-y-6 text-left">
-                {/* --- TOGGLE SWITCH --- */}
-                <div className="flex justify-center mb-2">
-                  <div className="flex bg-gray-200/60 p-1.5 rounded-xl w-full max-w-md border border-gray-200 shadow-inner">
-                    <button
-                      type="button"
-                      onClick={() => setContainerType("bottle")}
-                      className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                        containerType === "bottle"
-                          ? "bg-white text-[#334155] shadow-sm border border-gray-200"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      Bottle
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setContainerType("bucket");
-                        setSelectedBox("");
-                        setSelectedCap("");
-                      }}
-                      className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                        containerType === "bucket"
-                          ? "bg-white text-[#334155] shadow-sm border border-gray-200"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      Bucket
-                    </button>
+                {/* --- TOP SETTINGS ROW --- */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Container Type */}
+                  <div>
+                    <label className="block text-center text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">
+                      Physical Type
+                    </label>
+                    <div className="flex bg-gray-200/60 p-1.5 rounded-xl w-full border border-gray-200 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={() => setContainerType("bottle")}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                          containerType === "bottle"
+                            ? "bg-white text-[#334155] shadow-sm border border-gray-200"
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        Bottle
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContainerType("bucket")}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                          containerType === "bucket"
+                            ? "bg-white text-[#334155] shadow-sm border border-gray-200"
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        Bucket
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Creation Mode Toggle */}
+                  <div>
+                    <label className="block text-center text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">
+                      Build Mode
+                    </label>
+                    <div className="flex bg-gray-200/60 p-1.5 rounded-xl w-full border border-gray-200 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCreationMode("custom");
+                          setSelectedBaseContainer("");
+                        }}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                          creationMode === "custom"
+                            ? "bg-white text-[#334155] shadow-sm border border-gray-200"
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        Custom
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCreationMode("variant");
+                          setSelectedBox("");
+                          setSelectedCap("");
+                          setSelectedSticker("");
+                        }}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                          creationMode === "variant"
+                            ? "bg-white text-[#334155] shadow-sm border border-gray-200"
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        Variant
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* 🔥 DYNAMIC: Base Container Selection */}
+                  {creationMode === "variant" && (
+                    <div className="md:col-span-2 p-5 bg-yellow-50/50 rounded-2xl shadow-sm border border-yellow-200/50 mb-2">
+                      <label className={labelClass}>
+                        Select Base{" "}
+                        {containerType === "bottle" ? "Bottle" : "Bucket"}
+                      </label>
+                      <select
+                        className={glassInput}
+                        name="base_container_id"
+                        required
+                        value={selectedBaseContainer}
+                        onChange={(e) =>
+                          setSelectedBaseContainer(e.target.value)
+                        }
+                      >
+                        <option value="" disabled>
+                          -- Select Existing{" "}
+                          {containerType === "bottle" ? "Bottle" : "Bucket"} --
+                        </option>
+                        {filteredExistingContainers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} (Base Capacity: {c.capacity_per_piece}{" "}
+                            {c.capacity_unit})
+                          </option>
+                        ))}
+                      </select>
+                      {filteredExistingContainers.length === 0 && (
+                        <p className="text-xs text-red-500 mt-2 font-bold">
+                          No existing {containerType}s found. Please use Custom
+                          mode.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {/* --- 1. BASIC DETAILS --- */}
                   <div className="md:col-span-2">
-                    <label className={labelClass}>Bottles/Buckets Name</label>
+                    <label className={labelClass}>
+                      {creationMode === "variant"
+                        ? `New Variant Name`
+                        : `${containerType === "bottle" ? "Bottle" : "Bucket"} Name`}
+                    </label>
                     <input
                       className={glassInput}
                       type="text"
                       name="name"
                       placeholder={
-                        containerType === "bottle"
-                          ? "e.g., 1L Gold Bottle"
-                          : "e.g., 25L Red Bucket"
+                        creationMode === "variant"
+                          ? `e.g., 1L Gold ${containerType === "bottle" ? "Bottle" : "Bucket"} (800ml Fill)`
+                          : containerType === "bottle"
+                            ? "e.g., 1L Gold Bottle"
+                            : "e.g., 25L Red Bucket"
                       }
                       required
                     />
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className={labelClass}>Capacity</label>
+                    <label className={labelClass}>
+                      {creationMode === "variant"
+                        ? "New Fill Capacity"
+                        : "Capacity"}
+                    </label>
                     <div className="flex gap-2">
                       <input
                         className={`${glassInput} w-full`}
@@ -196,68 +314,112 @@ export default function AddContainerModal({
                     </div>
                   </div>
 
-                  {/* --- CONDITIONALLY RENDER BOX & CAP BASED ON TOGGLE --- */}
-                  {containerType === "bottle" && (
+                  {/* --- CONDITIONALLY RENDER BOX/CAP/STICKER ONLY IF "CUSTOM" --- */}
+                  {creationMode === "custom" && (
                     <>
-                      {/* --- 2. MASTER BOX --- */}
-                      <div className="md:col-span-2 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
-                        <h3 className="text-sm font-extrabold text-gray-700 mb-4 border-b border-gray-100 pb-2">
-                          Master Box Configuration
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="md:col-span-2">
-                            <label className={labelClass}>Select Box</label>
+                      {/* --- 2. MASTER BOX (BOTTLES ONLY) --- */}
+                      {containerType === "bottle" && (
+                        <div className="md:col-span-2 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
+                          <h3 className="text-sm font-extrabold text-gray-700 mb-4 border-b border-gray-100 pb-2">
+                            Master Box Configuration
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="md:col-span-2">
+                              <label className={labelClass}>Select Box</label>
+                              <select
+                                className={`${glassInput} w-full`}
+                                name="box_id"
+                                value={selectedBox}
+                                onChange={(e) => setSelectedBox(e.target.value)}
+                              >
+                                <option value="">-- No Box Needed --</option>
+                                {boxes.map((b) => (
+                                  <option key={b.id} value={b.id}>
+                                    {b.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className={labelClass}>
+                                Bottles per Box
+                              </label>
+                              <input
+                                className={`${glassInput} w-full`}
+                                type="number"
+                                name="pieces_per_box"
+                                min="1"
+                                required={!!selectedBox}
+                                readOnly={!selectedBox}
+                                value={!selectedBox ? 1 : piecesPerBox}
+                                onChange={(e) =>
+                                  setPiecesPerBox(
+                                    e.target.value
+                                      ? Number(e.target.value)
+                                      : "",
+                                  )
+                                }
+                                onKeyDown={blockInvalidChars}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* --- 3. CAP (BOTTLES ONLY) --- */}
+                      {containerType === "bottle" && (
+                        <div className="md:col-span-2 flex items-start gap-4 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
+                          <div className="flex-1">
+                            <label className={labelClass}>Bottle Cap</label>
                             <select
                               className={`${glassInput} w-full`}
-                              name="box_id"
-                              value={selectedBox}
-                              onChange={(e) => setSelectedBox(e.target.value)}
+                              name="cap_id"
+                              value={selectedCap}
+                              onChange={(e) => setSelectedCap(e.target.value)}
                             >
-                              <option value="">-- No Box Needed --</option>
-                              {boxes.map((b) => (
-                                <option key={b.id} value={b.id}>
-                                  {b.name}
+                              <option value="">-- No Cap Needed --</option>
+                              {caps.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
                                 </option>
                               ))}
                             </select>
                           </div>
-                          <div>
-                            <label className={labelClass}>
-                              Bottles per Box
-                            </label>
+                          <div className="w-24 shrink-0">
+                            <label className={labelClass}>Qty</label>
                             <input
                               className={`${glassInput} w-full`}
                               type="number"
-                              name="pieces_per_box"
+                              name="cap_quantity"
                               min="1"
-                              required={!!selectedBox}
-                              readOnly={!selectedBox}
-                              value={!selectedBox ? 1 : piecesPerBox}
-                              onChange={(e) =>
-                                setPiecesPerBox(
-                                  e.target.value ? Number(e.target.value) : "",
-                                )
-                              }
+                              defaultValue={1}
+                              disabled={!selectedCap}
                               onKeyDown={blockInvalidChars}
                             />
                           </div>
                         </div>
-                      </div>
+                      )}
 
-                      {/* --- 3. CAP --- */}
+                      {/* --- 4. STICKER (MANDATORY FOR CUSTOM) --- */}
                       <div className="md:col-span-2 flex items-start gap-4 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
                         <div className="flex-1">
-                          <label className={labelClass}>Bottle Cap</label>
+                          <label className={labelClass}>
+                            Sticker / Label{" "}
+                            <span className="text-red-500">*</span>
+                          </label>
                           <select
                             className={`${glassInput} w-full`}
-                            name="cap_id"
-                            value={selectedCap}
-                            onChange={(e) => setSelectedCap(e.target.value)}
+                            name="sticker_id"
+                            required
+                            value={selectedSticker}
+                            onChange={(e) => setSelectedSticker(e.target.value)}
                           >
-                            <option value="">-- No Cap Needed --</option>
-                            {caps.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
+                            <option value="">
+                              -- Select Mandatory Sticker --
+                            </option>
+                            {stickers.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
                               </option>
                             ))}
                           </select>
@@ -267,51 +429,16 @@ export default function AddContainerModal({
                           <input
                             className={`${glassInput} w-full`}
                             type="number"
-                            name="cap_quantity"
+                            name="sticker_quantity"
                             min="1"
                             defaultValue={1}
-                            disabled={!selectedCap}
+                            required
                             onKeyDown={blockInvalidChars}
                           />
                         </div>
                       </div>
                     </>
                   )}
-
-                  {/* --- 4. STICKER (MANDATORY FOR BOTH) --- */}
-                  <div className="md:col-span-2 flex items-start gap-4 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex-1">
-                      <label className={labelClass}>
-                        Sticker / Label <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        className={`${glassInput} w-full`}
-                        name="sticker_id"
-                        required
-                        value={selectedSticker}
-                        onChange={(e) => setSelectedSticker(e.target.value)}
-                      >
-                        <option value="">-- Select Mandatory Sticker --</option>
-                        {stickers.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="w-24 shrink-0">
-                      <label className={labelClass}>Qty</label>
-                      <input
-                        className={`${glassInput} w-full`}
-                        type="number"
-                        name="sticker_quantity"
-                        min="1"
-                        defaultValue={1}
-                        required
-                        onKeyDown={blockInvalidChars}
-                      />
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -334,7 +461,7 @@ export default function AddContainerModal({
                       <Spinner /> Saving...
                     </>
                   ) : (
-                    "Save Container"
+                    `Save ${containerType === "bottle" ? "Bottle" : "Bucket"}`
                   )}
                 </button>
               </div>

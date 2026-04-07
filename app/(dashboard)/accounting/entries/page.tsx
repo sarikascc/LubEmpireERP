@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import TransactionFilters from "@/components/accounting/TransactionFilters";
+import TransactionFilters from "@/components/accounting/TransactionFilters"; // NORMAL IMPORT
 
 export default async function AccountingEntriesPage({
   searchParams,
@@ -26,17 +26,40 @@ export default async function AccountingEntriesPage({
 
   const supabase = await createClient();
 
-  let query = supabase
+  // Query A: For the HTML Table (Paginated - 20 per page)
+  let tableQuery = supabase
     .from("accounting_entries")
     .select("*", { count: "exact" })
     .order("created_at", { ascending: false });
 
-  if (search) query = query.ilike("description", `%${search}%`);
-  if (currentType !== "all") query = query.eq("entry_type", currentType);
-  if (startDate) query = query.gte("created_at", `${startDate}T00:00:00.000Z`);
-  if (endDate) query = query.lte("created_at", `${endDate}T23:59:59.999Z`);
+  // Query B: For the Excel Export (Gets ALL filtered rows)
+  let exportQuery = supabase
+    .from("accounting_entries")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-  const { data: entriesData, count } = await query.range(from, to);
+  // Apply filters to BOTH queries
+  if (search) {
+    tableQuery = tableQuery.ilike("description", `%${search}%`);
+    exportQuery = exportQuery.ilike("description", `%${search}%`);
+  }
+  if (currentType !== "all") {
+    tableQuery = tableQuery.eq("entry_type", currentType);
+    exportQuery = exportQuery.eq("entry_type", currentType);
+  }
+  if (startDate) {
+    tableQuery = tableQuery.gte("created_at", `${startDate}T00:00:00.000Z`);
+    exportQuery = exportQuery.gte("created_at", `${startDate}T00:00:00.000Z`);
+  }
+  if (endDate) {
+    tableQuery = tableQuery.lte("created_at", `${endDate}T23:59:59.999Z`);
+    exportQuery = exportQuery.lte("created_at", `${endDate}T23:59:59.999Z`);
+  }
+
+  // Fetch data
+  const { data: entriesData, count } = await tableQuery.range(from, to);
+  const { data: fullExportData } = await exportQuery;
+
   const totalPages = Math.ceil((count || 0) / pageSize);
 
   const buildPaginationUrl = (newPage: number) => {
@@ -73,7 +96,8 @@ export default async function AccountingEntriesPage({
               Expense
             </Link>
           </div>
-          <TransactionFilters />
+
+          <TransactionFilters dataToExport={fullExportData || []} />
         </div>
 
         <div className="overflow-auto flex-1 bg-white">
@@ -122,7 +146,6 @@ export default async function AccountingEntriesPage({
                     cleanDesc = match[3].trim().replace(/^\(|\)$/g, "");
                   }
 
-                  // Determine if the profit is a loss to style it red
                   const isLoss = Number(entry.profit) < 0;
 
                   return (
@@ -180,8 +203,6 @@ export default async function AccountingEntriesPage({
                           <span className="text-gray-300">-</span>
                         )}
                       </td>
-
-                      {/* --- FIX: AMOUNT COLUMN SIGN FORMATTING --- */}
                       <td className="p-3 text-right">
                         <div
                           className={`text-[15px] font-black tracking-tight ${entry.entry_type === "Income" ? "text-green-600" : "text-gray-800"}`}
@@ -196,8 +217,6 @@ export default async function AccountingEntriesPage({
                           )}
                         </div>
                       </td>
-
-                      {/* --- FIX: PROFIT COLUMN SIGN FORMATTING --- */}
                       <td className="p-3 text-right">
                         {entry.entry_type === "Income" &&
                         entry.profit != null ? (
