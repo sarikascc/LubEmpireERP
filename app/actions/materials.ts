@@ -40,6 +40,7 @@ export async function deleteMaterialAction(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath("/materials/raw-materials");
 }
+
 // 3. Edit Material Name/Unit
 export async function editRawMaterialAction(formData: FormData) {
   const id = formData.get("id") as string;
@@ -112,13 +113,13 @@ export async function purchaseRawMaterialAction(formData: FormData) {
 
   if (stockError) throw new Error("Failed to log transaction");
 
-  // Step D: Expense Entry (🔥 FIXED: Now saving Qty, Rate, and Unit!)
+  // Step D: Expense Entry
   const { error: accError } = await supabase.from("accounting_entries").insert({
     entry_type: "Expense",
     amount: total_cost,
-    quantity: quantity, // <-- ADDED
-    rate: rate, // <-- ADDED
-    unit: material.unit, // <-- ADDED (e.g., Ltr, KG, PCS)
+    quantity: quantity,
+    rate: rate,
+    unit: material.unit,
     description: `Purchase - ${supplier} (${quantity} ${material.unit} of ${material.name})`,
   });
 
@@ -126,6 +127,8 @@ export async function purchaseRawMaterialAction(formData: FormData) {
 
   revalidatePath("/materials/raw-materials");
 }
+
+// 5. Adjust Stock
 export async function adjustRawMaterialAction(formData: FormData) {
   const material_id = formData.get("material_id") as string;
   const adjustment_type = formData.get("adjustment_type") as string;
@@ -162,7 +165,7 @@ export async function adjustRawMaterialAction(formData: FormData) {
 
   const { error } = await supabase.from("material_transactions").insert({
     material_id,
-    transaction_type: db_transaction_type, // Using translated string
+    transaction_type: db_transaction_type,
     quantity: actualQuantity,
     rate: 0,
     reason,
@@ -175,6 +178,96 @@ export async function adjustRawMaterialAction(formData: FormData) {
     .from("materials")
     .update({ stock: newStock })
     .eq("id", material_id);
+
+  revalidatePath("/materials/raw-materials");
+}
+
+// 🔥 NEW: 6. Edit Existing Purchase (With Moving Average Recalculation)
+export async function editRawMaterialPurchaseAction(formData: FormData) {
+  const transaction_id = formData.get("transaction_id") as string;
+  const new_quantity = Number(formData.get("quantity"));
+  const new_rate = Number(formData.get("rate"));
+  const new_supplier = formData.get("supplier") as string;
+
+  const supabase = await createClient();
+
+  // 1. Fetch the exact old transaction details (including material name/unit for the ledger)
+  const { data: txn, error: txnError } = await supabase
+    .from("material_transactions")
+    .select("*, materials(name, unit)")
+    .eq("id", transaction_id)
+    .single();
+
+  if (txnError || !txn) throw new Error("Transaction not found.");
+
+  const old_quantity = Number(txn.quantity);
+  const old_rate = Number(txn.rate);
+  const material_id = txn.material_id;
+
+  // Safe extraction for TS
+  const matData = txn.materials as any;
+  const material_name = matData?.name || "Unknown Material";
+  const material_unit = matData?.unit || "Unit";
+
+  // 2. Fetch the current material stock and average cost
+  const { data: material } = await supabase
+    .from("materials")
+    .select("stock, cost_per_unit")
+    .eq("id", material_id)
+    .single();
+
+  let currentStock = Number(material?.stock || 0);
+  let currentAvgCost = Number(material?.cost_per_unit || 0);
+
+  // 3. REVERSE the old purchase out of the warehouse value
+  const currentTotalValue = currentStock * currentAvgCost;
+  const oldPurchaseValue = old_quantity * old_rate;
+
+  let tempStock = currentStock - old_quantity;
+  let tempTotalValue = currentTotalValue - oldPurchaseValue;
+
+  // Prevent floating point weirdness from dropping it below absolute zero
+  if (tempStock < 0) tempStock = 0;
+  if (tempTotalValue < 0) tempTotalValue = 0;
+
+  // 4. APPLY the newly edited purchase values
+  const newPurchaseValue = new_quantity * new_rate;
+  const newStock = tempStock + new_quantity;
+
+  // Calculate the new blended average cost!
+  const newAvgCost =
+    newStock > 0 ? (tempTotalValue + newPurchaseValue) / newStock : 0;
+
+  // 5. Update Database: Materials Table
+  await supabase
+    .from("materials")
+    .update({ stock: newStock, cost_per_unit: newAvgCost })
+    .eq("id", material_id);
+
+  // 6. Update Database: Material Transactions Table
+  await supabase
+    .from("material_transactions")
+    .update({
+      quantity: new_quantity,
+      rate: new_rate,
+      reason: new_supplier,
+    })
+    .eq("id", transaction_id);
+
+  // 7. Update Database: Accounting Ledger
+  const old_desc = `Purchase - ${txn.reason} (${old_quantity} ${material_unit} of ${material_name})`;
+  const new_desc = `Purchase - ${new_supplier} (${new_quantity} ${material_unit} of ${material_name})`;
+  const new_amount = new_quantity * new_rate;
+
+  await supabase
+    .from("accounting_entries")
+    .update({
+      amount: new_amount,
+      quantity: new_quantity,
+      rate: new_rate,
+      description: new_desc,
+    })
+    .eq("description", old_desc);
 
   revalidatePath("/materials/raw-materials");
 }

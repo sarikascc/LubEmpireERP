@@ -4,6 +4,7 @@ import AddContainerModal from "@/components/materials/containers/AddContainerMod
 import ContainerRowActions from "@/components/materials/containers/ContainerRowActions";
 import ContainerStockInModal from "@/components/materials/containers/ContainerStockInModal";
 import ContainerFilters from "@/components/materials/containers/ContainerFilters";
+import EditContainerStockInModal from "@/components/materials/containers/EditContainerStockInModal"; // 🔥 NEW IMPORT
 
 export default async function ContainersPage({
   searchParams,
@@ -30,6 +31,9 @@ export default async function ContainersPage({
   let containersData: any[] = [];
   let transactionsData: any[] = [];
   let count = 0;
+
+  // 🔥 Dictionary to store the newest deduction timestamp for each container
+  let latestDeductions: Record<string, number> = {};
 
   // 🔥 1. FETCH ALL CONTAINERS (INCLUDING BASE ID FOR SHARED STOCK)
   const { data: allContainers } = await supabase
@@ -63,6 +67,37 @@ export default async function ContainersPage({
     const { data, count: c } = await query.range(from, to);
     transactionsData = data || [];
     count = c || 0;
+
+    // 🔥 MAM'S LOGIC: FETCH ALL DEDUCTIONS TO SEE IF STOCK WAS USED
+    if (transactionsData.length > 0) {
+      const containerIdsOnPage = [
+        ...new Set(transactionsData.map((t) => t.container_id)),
+      ];
+
+      const { data: deductions } = await supabase
+        .from("container_transactions")
+        .select("container_id, created_at")
+        .in("transaction_type", [
+          "Order Use",
+          "Manual Remove",
+          "Order Increase",
+          "Order Decrease (Refund)",
+          "Order Deleted",
+        ]) // Any order activity
+        .in("container_id", containerIdsOnPage);
+
+      if (deductions) {
+        deductions.forEach((d) => {
+          const time = new Date(d.created_at).getTime();
+          if (
+            !latestDeductions[d.container_id] ||
+            time > latestDeductions[d.container_id]
+          ) {
+            latestDeductions[d.container_id] = time; // Save the absolute newest deduction time
+          }
+        });
+      }
+    }
   }
 
   const totalPages = Math.ceil(count / pageSize);
@@ -289,7 +324,6 @@ export default async function ContainersPage({
                           </td>
 
                           <td className="p-4 text-right align-middle">
-                            {/* 🔥 HERE IS THE FIX: Passing existingContainers! */}
                             <ContainerRowActions
                               container={container}
                               boxes={boxes}
@@ -333,16 +367,16 @@ export default async function ContainersPage({
             </div>
 
             <div className="overflow-auto flex-1 bg-white">
-              <table className="erp-table w-full table-fixed min-w-[900px]">
+              <table className="erp-table w-full table-fixed min-w-[1000px]">
                 <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
                   <tr>
-                    <th className="w-[25%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Bottles/Buckets Name
                     </th>
-                    <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Qty Added
                     </th>
-                    <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Rate (₹)
                     </th>
                     <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
@@ -351,8 +385,12 @@ export default async function ContainersPage({
                     <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b pl-8">
                       Supplier Details
                     </th>
-                    <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Date
+                    </th>
+                    {/* 🔥 ADDED ACTIONS HEADER */}
+                    <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -361,6 +399,14 @@ export default async function ContainersPage({
                     transactionsData.map((txn) => {
                       const totalAmount =
                         Number(txn.quantity) * Number(txn.rate);
+
+                      // 🔥 APPLY THE LOGIC: Compare purchase date to latest deduction date
+                      const txnTime = new Date(txn.created_at).getTime();
+                      const lastDeductionTime =
+                        latestDeductions[txn.container_id] || 0;
+
+                      // If a deduction happened AFTER this was purchased, it is locked.
+                      const isUsed = lastDeductionTime > txnTime;
 
                       return (
                         <tr
@@ -386,11 +432,24 @@ export default async function ContainersPage({
                               maximumFractionDigits: 2,
                             })}
                           </td>
-                          <td className="p-4 text-xs text-gray-500 truncate pl-8">
+                          <td className="p-4 text-left text-xs text-gray-500 truncate pl-8">
                             {txn.reason}
                           </td>
                           <td className="p-4 text-sm text-gray-600 text-right">
                             {new Date(txn.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="p-4 text-right">
+                            {/* 🔥 ONLY SHOW EDIT IF NOT USED */}
+                            {!isUsed ? (
+                              <EditContainerStockInModal transaction={txn} />
+                            ) : (
+                              <span
+                                className="text-[10px] uppercase font-bold text-gray-400 tracking-wider cursor-not-allowed"
+                                title="Cannot edit: This stock has already been consumed in orders or adjustments."
+                              >
+                                Locked
+                              </span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -398,7 +457,7 @@ export default async function ContainersPage({
                   ) : (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7} // 🔥 UPDATED TO 7 COLUMNS
                         className="text-center py-20 text-gray-400"
                       >
                         No purchase history found.

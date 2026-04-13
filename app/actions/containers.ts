@@ -21,14 +21,6 @@ export async function addContainerAction(formData: FormData) {
     base_container_id = null;
   }
 
-  // Debugging log to see what the server is actually receiving
-  console.log(
-    "[Add Container] Mode:",
-    creation_mode,
-    "| Base ID Received:",
-    base_container_id,
-  );
-
   const supabase = await createClient();
 
   let box_id: string | null = null;
@@ -54,10 +46,6 @@ export async function addContainerAction(formData: FormData) {
       .single();
 
     if (fetchError || !baseContainer) {
-      console.error(
-        "[Add Container] Failed to fetch base container:",
-        fetchError,
-      );
       throw new Error(
         `Could not find the base container in the database (ID: ${base_container_id}). It may have been deleted.`,
       );
@@ -119,13 +107,6 @@ export async function editContainerAction(formData: FormData) {
     base_container_id = null;
   }
 
-  console.log(
-    "[Edit Container] Mode:",
-    creation_mode,
-    "| Base ID Received:",
-    base_container_id,
-  );
-
   const supabase = await createClient();
 
   let box_id: string | null = null;
@@ -149,10 +130,6 @@ export async function editContainerAction(formData: FormData) {
       .single();
 
     if (fetchError || !baseContainer) {
-      console.error(
-        "[Edit Container] Failed to fetch base container:",
-        fetchError,
-      );
       throw new Error(
         `Base container not found in the database (ID: ${base_container_id}).`,
       );
@@ -315,6 +292,92 @@ export async function adjustContainerAction(formData: FormData) {
     rate: 0,
     reason: "Stock Adjustment",
   });
+
+  revalidatePath("/materials/containers");
+}
+
+// 🔥 NEW: Edit Existing Purchase (With Moving Average Recalculation)
+export async function editContainerPurchaseAction(formData: FormData) {
+  const transaction_id = formData.get("transaction_id") as string;
+  const new_quantity = Number(formData.get("quantity"));
+  const new_rate = Number(formData.get("rate"));
+  const new_supplier = formData.get("supplier") as string;
+
+  const supabase = await createClient();
+
+  // 1. Fetch the exact old transaction details
+  const { data: txn, error: txnError } = await supabase
+    .from("container_transactions")
+    .select("*, containers(name)")
+    .eq("id", transaction_id)
+    .single();
+
+  if (txnError || !txn) throw new Error("Transaction not found.");
+
+  const old_quantity = Number(txn.quantity);
+  const old_rate = Number(txn.rate);
+  const container_id = txn.container_id;
+
+  const contData = txn.containers as any;
+  const container_name = contData?.name || "Unknown Container";
+
+  // 2. Fetch the current container stock and average cost
+  const { data: container } = await supabase
+    .from("containers")
+    .select("stock, cost_per_piece")
+    .eq("id", container_id)
+    .single();
+
+  let currentStock = Number(container?.stock || 0);
+  let currentAvgCost = Number(container?.cost_per_piece || 0);
+
+  // 3. REVERSE the old purchase out of the warehouse value
+  const currentTotalValue = currentStock * currentAvgCost;
+  const oldPurchaseValue = old_quantity * old_rate;
+
+  let tempStock = currentStock - old_quantity;
+  let tempTotalValue = currentTotalValue - oldPurchaseValue;
+
+  if (tempStock < 0) tempStock = 0;
+  if (tempTotalValue < 0) tempTotalValue = 0;
+
+  // 4. APPLY the newly edited purchase values
+  const newPurchaseValue = new_quantity * new_rate;
+  const newStock = tempStock + new_quantity;
+
+  const newAvgCost =
+    newStock > 0 ? (tempTotalValue + newPurchaseValue) / newStock : 0;
+
+  // 5. Update Database: Containers Table
+  await supabase
+    .from("containers")
+    .update({ stock: newStock, cost_per_piece: newAvgCost })
+    .eq("id", container_id);
+
+  // 6. Update Database: Container Transactions Table
+  await supabase
+    .from("container_transactions")
+    .update({
+      quantity: new_quantity,
+      rate: new_rate,
+      reason: new_supplier,
+    })
+    .eq("id", transaction_id);
+
+  // 7. Update Database: Accounting Ledger
+  const old_desc = `Purchase - ${txn.reason} (${old_quantity} units of ${container_name})`;
+  const new_desc = `Purchase - ${new_supplier} (${new_quantity} units of ${container_name})`;
+  const new_amount = new_quantity * new_rate;
+
+  await supabase
+    .from("accounting_entries")
+    .update({
+      amount: new_amount,
+      quantity: new_quantity,
+      rate: new_rate,
+      description: new_desc,
+    })
+    .eq("description", old_desc);
 
   revalidatePath("/materials/containers");
 }

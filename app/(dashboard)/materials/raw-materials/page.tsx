@@ -4,6 +4,7 @@ import AddMaterialModal from "@/components/materials/AddMaterialModal";
 import RowActions from "@/components/materials/RowActions";
 import StockInModal from "@/components/materials/StockInModal";
 import MaterialFilters from "@/components/materials/MaterialFilter";
+import EditStockInModal from "@/components/materials/EditStockInModal";
 
 export default async function RawMaterialsPage({
   searchParams,
@@ -31,6 +32,9 @@ export default async function RawMaterialsPage({
   let transactionsData: any[] = [];
   let count = 0;
 
+  // 🔥 Dictionary to store the newest deduction timestamp for each material
+  let latestDeductions: Record<string, number> = {};
+
   if (tab === "materials") {
     let query = supabase
       .from("materials")
@@ -55,6 +59,35 @@ export default async function RawMaterialsPage({
     const { data, count: c } = await query.range(from, to);
     transactionsData = data || [];
     count = c || 0;
+
+    // 🔥 MAM'S LOGIC: FETCH ALL DEDUCTIONS TO SEE IF STOCK WAS USED
+    if (transactionsData.length > 0) {
+      const materialIdsOnPage = [
+        ...new Set(transactionsData.map((t) => t.material_id)),
+      ];
+
+      const { data: deductions } = await supabase
+        .from("material_transactions")
+        .select("material_id, created_at")
+        .in("transaction_type", [
+          "Order Use",
+          "Manual Remove",
+          "Production Use",
+        ]) // Any transaction that removes stock
+        .in("material_id", materialIdsOnPage);
+
+      if (deductions) {
+        deductions.forEach((d) => {
+          const time = new Date(d.created_at).getTime();
+          if (
+            !latestDeductions[d.material_id] ||
+            time > latestDeductions[d.material_id]
+          ) {
+            latestDeductions[d.material_id] = time; // Save the absolute newest deduction time
+          }
+        });
+      }
+    }
   }
 
   const totalPages = Math.ceil(count / pageSize);
@@ -175,36 +208,46 @@ export default async function RawMaterialsPage({
             </div>
 
             <div className="overflow-auto flex-1 bg-white">
-              <table className="erp-table w-full table-fixed min-w-[900px]">
+              <table className="erp-table w-full table-fixed min-w-[1000px]">
                 <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
                   <tr>
                     <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Material Name
                     </th>
-                    <th className="w-[15%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Qty Added
                     </th>
-                    <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Rate (₹)
                     </th>
-                    {/* 🔥 NEW TOTAL AMOUNT COLUMN 🔥 */}
                     <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Total (₹)
                     </th>
-                    <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b pl-8">
                       Supplier Details
                     </th>
                     <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Date
+                    </th>
+                    {/* 🔥 ADDED ACTIONS HEADER */}
+                    <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                      Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {transactionsData.length ? (
                     transactionsData.map((txn) => {
-                      // Do the math right here!
                       const totalAmount =
                         Number(txn.quantity) * Number(txn.rate);
+
+                      // 🔥 APPLY THE LOGIC: Compare purchase date to latest deduction date
+                      const txnTime = new Date(txn.created_at).getTime();
+                      const lastDeductionTime =
+                        latestDeductions[txn.material_id] || 0;
+
+                      // If a deduction happened AFTER this was purchased, it is locked.
+                      const isUsed = lastDeductionTime > txnTime;
 
                       return (
                         <tr
@@ -214,7 +257,7 @@ export default async function RawMaterialsPage({
                           <td className="p-4 text-left font-semibold text-[var(--lub-dark)]">
                             {txn.materials?.name}
                           </td>
-                          <td className="p-4 text-center font-bold text-green-600">
+                          <td className="p-4 text-right font-bold text-green-600">
                             +{Math.round(Number(txn.quantity))}{" "}
                             <span className="text-xs font-normal text-gray-400">
                               {txn.materials?.unit}
@@ -223,7 +266,6 @@ export default async function RawMaterialsPage({
                           <td className="p-4 text-right font-medium text-gray-700">
                             ₹{Number(txn.rate).toFixed(2)}
                           </td>
-                          {/* 🔥 NEW TOTAL AMOUNT CELL 🔥 */}
                           <td className="p-4 text-right font-black text-gray-800">
                             ₹
                             {totalAmount.toLocaleString("en-IN", {
@@ -231,11 +273,24 @@ export default async function RawMaterialsPage({
                               maximumFractionDigits: 2,
                             })}
                           </td>
-                          <td className="p-4 text-left text-xs text-gray-500 truncate">
+                          <td className="p-4 text-left text-xs text-gray-500 truncate pl-8">
                             {txn.reason}
                           </td>
                           <td className="p-4 text-sm text-gray-600 text-right">
                             {new Date(txn.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="p-4 text-right">
+                            {/* 🔥 ONLY SHOW EDIT IF NOT USED */}
+                            {!isUsed ? (
+                              <EditStockInModal transaction={txn} />
+                            ) : (
+                              <span
+                                className="text-[10px] uppercase font-bold text-gray-400 tracking-wider cursor-not-allowed"
+                                title="Cannot edit: This stock has already been consumed in production or adjustments."
+                              >
+                                Locked
+                              </span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -243,7 +298,7 @@ export default async function RawMaterialsPage({
                   ) : (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7} // 🔥 UPDATED TO 7 COLUMNS
                         className="text-center py-20 text-gray-400"
                       >
                         No purchase history found.
@@ -266,13 +321,21 @@ export default async function RawMaterialsPage({
             <div className="flex gap-2">
               <Link
                 href={buildPaginationUrl(currentPage - 1)}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg border ${currentPage <= 1 ? "pointer-events-none opacity-50 bg-gray-50" : "bg-white hover:bg-gray-50"}`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg border ${
+                  currentPage <= 1
+                    ? "pointer-events-none opacity-50 bg-gray-50"
+                    : "bg-white hover:bg-gray-50"
+                }`}
               >
                 Previous
               </Link>
               <Link
                 href={buildPaginationUrl(currentPage + 1)}
-                className={`px-4 py-2 text-sm font-semibold rounded-lg border ${currentPage >= totalPages ? "pointer-events-none opacity-50 bg-gray-50" : "bg-white hover:bg-gray-50"}`}
+                className={`px-4 py-2 text-sm font-semibold rounded-lg border ${
+                  currentPage >= totalPages
+                    ? "pointer-events-none opacity-50 bg-gray-50"
+                    : "bg-white hover:bg-gray-50"
+                }`}
               >
                 Next
               </Link>
