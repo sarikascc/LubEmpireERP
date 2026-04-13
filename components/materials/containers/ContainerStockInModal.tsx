@@ -7,14 +7,17 @@ import { purchaseContainerAction } from "@/app/actions/containers";
 export default function ContainerStockInModal({
   containers,
 }: {
-  containers: { id: string; name: string }[];
+  // 🔥 Added base_container_id to the type definition so we can check it
+  containers: { id: string; name: string; base_container_id?: string | null }[];
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedContainer, setSelectedContainer] = useState("");
 
-  // 🔥 CHANGED TO e.preventDefault() TO CONTROL THE LOADER
+  // 🔥 BULLETPROOF FILTER: Ensure ONLY Base Containers (parents) make it into the dropdown
+  const baseContainersOnly = containers.filter((c) => !c.base_container_id);
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setIsSubmitting(true);
@@ -120,9 +123,10 @@ export default function ContainerStockInModal({
                     onChange={(e) => setSelectedContainer(e.target.value)}
                   >
                     <option value="" disabled>
-                      - Select Bottle/Bucket -
+                      - Select Base Bottle/Bucket -
                     </option>
-                    {containers.map((c) => (
+                    {/* 🔥 Now mapping over the strictly filtered array! */}
+                    {baseContainersOnly.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>

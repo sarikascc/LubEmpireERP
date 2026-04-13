@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   deleteContainerAction,
@@ -12,33 +12,70 @@ export default function ContainerRowActions({
   boxes,
   stickers,
   caps,
+  existingContainers = [], // 🔥 Added to receive base containers
 }: {
   container: any;
   boxes: { id: string; name: string }[];
   stickers: { id: string; name: string }[];
   caps: { id: string; name: string }[];
+  existingContainers?: {
+    id: string;
+    name: string;
+    capacity_per_piece: number;
+    capacity_unit: string;
+    type?: string;
+    base_container_id?: string | null;
+  }[];
 }) {
   const router = useRouter();
 
-  // --- MODAL STATES ---
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-
-  // --- LOADING STATES ---
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Initialize the form state with the container's existing data
+  // --- INITIALIZE EDIT STATES BASED ON EXISTING CONTAINER ---
   const [containerType, setContainerType] = useState<"bottle" | "bucket">(
     container.type?.toLowerCase() === "bucket" ? "bucket" : "bottle",
+  );
+  const [creationMode, setCreationMode] = useState<"custom" | "variant">(
+    container.base_container_id ? "variant" : "custom",
+  );
+
+  const [selectedBaseContainer, setSelectedBaseContainer] = useState(
+    container.base_container_id || "",
   );
   const [selectedBox, setSelectedBox] = useState(container.box_id || "");
   const [selectedCap, setSelectedCap] = useState(container.cap_id || "");
   const [selectedSticker, setSelectedSticker] = useState(
     container.sticker_id || "",
   );
+  const [piecesPerBox, setPiecesPerBox] = useState<number | "">(
+    container.pieces_per_box || 1,
+  );
 
-  // --- HANDLERS ---
+  // 🔥 Strictly separate Bottles/Buckets AND completely hide Variants AND prevent self-selection
+  const filteredExistingContainers =
+    existingContainers?.filter((c) => {
+      const dbType = (c.type || "bottle").toLowerCase();
+      return (
+        dbType === containerType &&
+        !c.base_container_id &&
+        c.id !== container.id
+      );
+    }) || [];
+
+  useEffect(() => {
+    // Reset selections if the physical type is changed
+    if (isEditOpen) {
+      setSelectedBaseContainer("");
+    }
+  }, [containerType]);
+
+  const blockInvalidChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+  };
+
   const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -46,6 +83,7 @@ export default function ContainerRowActions({
     const formData = new FormData(e.currentTarget);
     formData.append("id", container.id);
     formData.append("type", containerType);
+    formData.append("creation_mode", creationMode);
 
     try {
       await editContainerAction(formData);
@@ -73,11 +111,6 @@ export default function ContainerRowActions({
     }
   };
 
-  const blockInvalidChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
-  };
-
-  // --- STYLES FOR THE GLASSY MODAL UI ---
   const glassBackdrop =
     "fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[60] p-4 text-left";
   const glassModal =
@@ -111,7 +144,7 @@ export default function ContainerRowActions({
 
   return (
     <div className="flex items-center justify-end gap-2">
-      {/* --- 1. EDIT BUTTON --- */}
+      {/* --- EDIT BUTTON --- */}
       <button
         onClick={() => setIsEditOpen(true)}
         className="p-2 text-gray-400 hover:text-[var(--lub-gold)] transition-colors focus:outline-none"
@@ -138,7 +171,7 @@ export default function ContainerRowActions({
         </svg>
       </button>
 
-      {/* --- 2. DELETE BUTTON --- */}
+      {/* --- DELETE BUTTON --- */}
       <button
         onClick={() => setIsDeleteOpen(true)}
         className="p-2 text-gray-400 hover:text-red-500 transition-colors focus:outline-none"
@@ -159,9 +192,7 @@ export default function ContainerRowActions({
         </svg>
       </button>
 
-      {/* =========================================
-          MODAL 1: UNIFIED DELETE CONFIRMATION
-      ========================================= */}
+      {/* DELETE MODAL */}
       {isDeleteOpen && (
         <div className={glassBackdrop}>
           <div className={`${glassModal} !max-w-sm p-8 text-center`}>
@@ -212,9 +243,7 @@ export default function ContainerRowActions({
         </div>
       )}
 
-      {/* =========================================
-          MODAL 2: INLINED EDIT MODAL
-      ========================================= */}
+      {/* EDIT MODAL */}
       {isEditOpen && (
         <div
           className={glassBackdrop}
@@ -238,39 +267,103 @@ export default function ContainerRowActions({
               className="flex flex-col flex-1 min-h-0"
             >
               <div className="flex-1 overflow-y-auto p-6 space-y-6 text-left">
-                {/* TYPE TOGGLE */}
-                <div className="flex justify-center mb-2">
-                  <div className="flex bg-gray-200/60 p-1.5 rounded-xl w-full max-w-md border border-gray-200 shadow-inner">
-                    <button
-                      type="button"
-                      onClick={() => setContainerType("bottle")}
-                      className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                        containerType === "bottle"
-                          ? "bg-white text-[#334155] shadow-sm border border-gray-200"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      Bottle
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setContainerType("bucket");
-                        setSelectedBox("");
-                        setSelectedCap("");
-                      }}
-                      className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
-                        containerType === "bucket"
-                          ? "bg-white text-[#334155] shadow-sm border border-gray-200"
-                          : "text-gray-500 hover:text-gray-700"
-                      }`}
-                    >
-                      Bucket
-                    </button>
+                {/* TOP SETTINGS ROW */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Container Type */}
+                  <div>
+                    <label className="block text-center text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">
+                      Physical Type
+                    </label>
+                    <div className="flex bg-gray-200/60 p-1.5 rounded-xl w-full border border-gray-200 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={() => setContainerType("bottle")}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${containerType === "bottle" ? "bg-white text-[#334155] shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        Bottle
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setContainerType("bucket");
+                          setSelectedBox("");
+                          setSelectedCap("");
+                        }}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${containerType === "bucket" ? "bg-white text-[#334155] shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        Bucket
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Creation Mode Toggle */}
+                  <div>
+                    <label className="block text-center text-[10px] font-bold text-gray-500 mb-1.5 uppercase tracking-wider">
+                      Build Mode
+                    </label>
+                    <div className="flex bg-gray-200/60 p-1.5 rounded-xl w-full border border-gray-200 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCreationMode("custom");
+                          setSelectedBaseContainer("");
+                        }}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${creationMode === "custom" ? "bg-white text-[#334155] shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        Custom
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCreationMode("variant");
+                          setSelectedBox("");
+                          setSelectedCap("");
+                          setSelectedSticker("");
+                        }}
+                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${creationMode === "variant" ? "bg-white text-[#334155] shadow-sm border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}
+                      >
+                        Variant
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* 🔥 DYNAMIC: Base Container Selection */}
+                  {creationMode === "variant" && (
+                    <div className="md:col-span-2 p-5 bg-yellow-50/50 rounded-2xl shadow-sm border border-yellow-200/50 mb-2">
+                      <label className={labelClass}>
+                        Select Base{" "}
+                        {containerType === "bottle" ? "Bottle" : "Bucket"}
+                      </label>
+                      <select
+                        className={glassInput}
+                        name="base_container_id"
+                        required
+                        value={selectedBaseContainer}
+                        onChange={(e) =>
+                          setSelectedBaseContainer(e.target.value)
+                        }
+                      >
+                        <option value="" disabled>
+                          -- Select Existing{" "}
+                          {containerType === "bottle" ? "Bottle" : "Bucket"} --
+                        </option>
+                        {filteredExistingContainers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} (Base Capacity: {c.capacity_per_piece}{" "}
+                            {c.capacity_unit})
+                          </option>
+                        ))}
+                      </select>
+                      {filteredExistingContainers.length === 0 && (
+                        <p className="text-xs text-red-500 mt-2 font-bold">
+                          No valid existing base {containerType}s found.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <div className="md:col-span-2">
                     <label className={labelClass}>Container Name</label>
                     <input
@@ -286,7 +379,7 @@ export default function ContainerRowActions({
                     <label className={labelClass}>Capacity</label>
                     <div className="flex gap-2">
                       <input
-                        className={glassInput}
+                        className={`${glassInput} w-full`}
                         type="number"
                         name="capacity_per_piece"
                         defaultValue={container.capacity_per_piece}
@@ -309,60 +402,103 @@ export default function ContainerRowActions({
                     </div>
                   </div>
 
-                  {containerType === "bottle" && (
+                  {creationMode === "custom" && (
                     <>
-                      <div className="md:col-span-2 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
-                        <h3 className="text-sm font-extrabold text-gray-700 mb-4 border-b border-gray-100 pb-2">
-                          Master Box Configuration
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="md:col-span-2">
-                            <label className={labelClass}>Select Box</label>
-                            <select
-                              className={glassInput}
-                              name="box_id"
-                              value={selectedBox}
-                              onChange={(e) => setSelectedBox(e.target.value)}
-                            >
-                              <option value="">-- No Box Needed --</option>
-                              {boxes.map((b) => (
-                                <option key={b.id} value={b.id}>
-                                  {b.name}
-                                </option>
-                              ))}
-                            </select>
+                      {containerType === "bottle" && (
+                        <>
+                          <div className="md:col-span-2 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
+                            <h3 className="text-sm font-extrabold text-gray-700 mb-4 border-b border-gray-100 pb-2">
+                              Master Box Configuration
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="md:col-span-2">
+                                <label className={labelClass}>Select Box</label>
+                                <select
+                                  className={glassInput}
+                                  name="box_id"
+                                  value={selectedBox}
+                                  onChange={(e) =>
+                                    setSelectedBox(e.target.value)
+                                  }
+                                >
+                                  <option value="">-- No Box Needed --</option>
+                                  {boxes.map((b) => (
+                                    <option key={b.id} value={b.id}>
+                                      {b.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label className={labelClass}>
+                                  Bottles per Box
+                                </label>
+                                <input
+                                  className={glassInput}
+                                  type="number"
+                                  name="pieces_per_box"
+                                  min="1"
+                                  defaultValue={container.pieces_per_box || 1}
+                                  required={!!selectedBox}
+                                  readOnly={!selectedBox}
+                                  onKeyDown={blockInvalidChars}
+                                />
+                              </div>
+                            </div>
                           </div>
-                          <div>
-                            <label className={labelClass}>
-                              Bottles per Box
-                            </label>
-                            <input
-                              className={glassInput}
-                              type="number"
-                              name="pieces_per_box"
-                              min="1"
-                              defaultValue={container.pieces_per_box || 1}
-                              required={!!selectedBox}
-                              readOnly={!selectedBox}
-                              onKeyDown={blockInvalidChars}
-                            />
+
+                          <div className="md:col-span-2 flex items-start gap-4 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
+                            <div className="flex-1">
+                              <label className={labelClass}>Bottle Cap</label>
+                              <select
+                                className={glassInput}
+                                name="cap_id"
+                                value={selectedCap}
+                                onChange={(e) => setSelectedCap(e.target.value)}
+                              >
+                                <option value="">-- No Cap Needed --</option>
+                                {caps.map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="w-24 shrink-0">
+                              <label className={labelClass}>Qty Used</label>
+                              <input
+                                className={glassInput}
+                                type="number"
+                                name="cap_quantity"
+                                min="1"
+                                defaultValue={container.cap_quantity || 1}
+                                disabled={!selectedCap}
+                                onKeyDown={blockInvalidChars}
+                              />
+                            </div>
                           </div>
-                        </div>
-                      </div>
+                        </>
+                      )}
 
                       <div className="md:col-span-2 flex items-start gap-4 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
                         <div className="flex-1">
-                          <label className={labelClass}>Bottle Cap</label>
+                          <label className={labelClass}>
+                            Sticker / Label{" "}
+                            <span className="text-red-500">*</span>
+                          </label>
                           <select
                             className={glassInput}
-                            name="cap_id"
-                            value={selectedCap}
-                            onChange={(e) => setSelectedCap(e.target.value)}
+                            name="sticker_id"
+                            required
+                            value={selectedSticker}
+                            onChange={(e) => setSelectedSticker(e.target.value)}
                           >
-                            <option value="">-- No Cap Needed --</option>
-                            {caps.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
+                            <option value="">
+                              -- Select Mandatory Sticker --
+                            </option>
+                            {stickers.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {s.name}
                               </option>
                             ))}
                           </select>
@@ -372,50 +508,16 @@ export default function ContainerRowActions({
                           <input
                             className={glassInput}
                             type="number"
-                            name="cap_quantity"
+                            name="sticker_quantity"
                             min="1"
-                            defaultValue={container.cap_quantity || 1}
-                            disabled={!selectedCap}
+                            defaultValue={container.sticker_quantity || 1}
+                            required
                             onKeyDown={blockInvalidChars}
                           />
                         </div>
                       </div>
                     </>
                   )}
-
-                  <div className="md:col-span-2 flex items-start gap-4 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
-                    <div className="flex-1">
-                      <label className={labelClass}>
-                        Sticker / Label <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        className={glassInput}
-                        name="sticker_id"
-                        required
-                        value={selectedSticker}
-                        onChange={(e) => setSelectedSticker(e.target.value)}
-                      >
-                        <option value="">-- Select Mandatory Sticker --</option>
-                        {stickers.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="w-24 shrink-0">
-                      <label className={labelClass}>Qty Used</label>
-                      <input
-                        className={glassInput}
-                        type="number"
-                        name="sticker_quantity"
-                        min="1"
-                        defaultValue={container.sticker_quantity || 1}
-                        required
-                        onKeyDown={blockInvalidChars}
-                      />
-                    </div>
-                  </div>
                 </div>
               </div>
 

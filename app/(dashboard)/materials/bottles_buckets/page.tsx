@@ -289,11 +289,13 @@ export default async function ContainersPage({
                           </td>
 
                           <td className="p-4 text-right align-middle">
+                            {/* 🔥 HERE IS THE FIX: Passing existingContainers! */}
                             <ContainerRowActions
                               container={container}
                               boxes={boxes}
                               stickers={stickers}
                               caps={caps}
+                              existingContainers={safeAllContainers}
                             />
                           </td>
                         </tr>
@@ -322,7 +324,6 @@ export default async function ContainersPage({
                 Bottles/Buckets Purchase History
               </h3>
               <div className="flex items-center gap-2 shrink-0">
-                {/* 🔥 FIX: TypeScript 'any' bypass to silence the error */}
                 <ContainerStockInModal
                   containers={safeAllContainers.filter(
                     (c: any) => !c.base_container_id,
@@ -338,14 +339,12 @@ export default async function ContainersPage({
                     <th className="w-[25%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Bottles/Buckets Name
                     </th>
-                    {/* 🔥 QTY AND RATE MOVED TO RIGHT ALIGNMENT */}
                     <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Qty Added
                     </th>
                     <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Rate (₹)
                     </th>
-                    {/* 🔥 NEW TOTAL AMOUNT COLUMN */}
                     <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Total (₹)
                     </th>
@@ -360,7 +359,6 @@ export default async function ContainersPage({
                 <tbody>
                   {transactionsData.length ? (
                     transactionsData.map((txn) => {
-                      // 🔥 Do the math right here!
                       const totalAmount =
                         Number(txn.quantity) * Number(txn.rate);
 
@@ -372,18 +370,15 @@ export default async function ContainersPage({
                           <td className="p-4 font-semibold text-[var(--lub-dark)]">
                             {txn.containers?.name}
                           </td>
-                          {/* 🔥 RIGHT ALIGNED */}
                           <td className="p-4 text-right font-bold text-green-600">
                             +{Number(txn.quantity).toFixed(0)}{" "}
                             <span className="text-xs font-normal text-gray-400">
                               PCS
                             </span>
                           </td>
-                          {/* 🔥 RIGHT ALIGNED */}
                           <td className="p-4 text-right font-medium text-gray-700">
                             ₹{Number(txn.rate).toFixed(2)}
                           </td>
-                          {/* 🔥 NEW TOTAL AMOUNT CELL */}
                           <td className="p-4 text-right font-black text-gray-800">
                             ₹
                             {totalAmount.toLocaleString("en-IN", {
@@ -403,7 +398,7 @@ export default async function ContainersPage({
                   ) : (
                     <tr>
                       <td
-                        colSpan={6} // 🔥 Updated to 6 columns
+                        colSpan={6}
                         className="text-center py-20 text-gray-400"
                       >
                         No purchase history found.

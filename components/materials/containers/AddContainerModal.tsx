@@ -18,7 +18,8 @@ export default function AddContainerModal({
     name: string;
     capacity_per_piece: number;
     capacity_unit: string;
-    type?: string; // Type might be optional for older legacy database entries
+    type?: string;
+    base_container_id?: string | null; // 🔥 ADDED: Type definition for the base id
   }[];
 }) {
   const router = useRouter();
@@ -39,12 +40,12 @@ export default function AddContainerModal({
   const [selectedSticker, setSelectedSticker] = useState("");
   const [piecesPerBox, setPiecesPerBox] = useState<number | "">(1);
 
-  // 🔥 BULLETPROOF FILTERING: Strictly separate Bottles and Buckets
+  // 🔥 BULLETPROOF FILTERING: Strictly separate Bottles/Buckets AND completely hide Variants
   const filteredExistingContainers =
     existingContainers?.filter((c) => {
-      // If an old container doesn't have a type yet, assume it's a bottle to prevent it from vanishing
       const dbType = (c.type || "bottle").toLowerCase();
-      return dbType === containerType;
+      // Only show items that match the type AND do NOT have a base_container_id
+      return dbType === containerType && !c.base_container_id;
     }) || [];
 
   // Reset the base container selection whenever the user switches between Bottle/Bucket
@@ -256,8 +257,8 @@ export default function AddContainerModal({
                       </select>
                       {filteredExistingContainers.length === 0 && (
                         <p className="text-xs text-red-500 mt-2 font-bold">
-                          No existing {containerType}s found. Please use Custom
-                          mode.
+                          No existing Base {containerType}s found. Please use
+                          Custom mode.
                         </p>
                       )}
                     </div>

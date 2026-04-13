@@ -10,7 +10,24 @@ export async function addContainerAction(formData: FormData) {
   const type = formData.get("type") as string;
 
   const creation_mode = formData.get("creation_mode") as string;
-  const base_container_id = formData.get("base_container_id") as string;
+  let base_container_id = formData.get("base_container_id") as string | null;
+
+  // 🔥 FIX: Clean up potential bad data from frontend
+  if (
+    base_container_id === "null" ||
+    base_container_id === "undefined" ||
+    base_container_id === ""
+  ) {
+    base_container_id = null;
+  }
+
+  // Debugging log to see what the server is actually receiving
+  console.log(
+    "[Add Container] Mode:",
+    creation_mode,
+    "| Base ID Received:",
+    base_container_id,
+  );
 
   const supabase = await createClient();
 
@@ -22,8 +39,11 @@ export async function addContainerAction(formData: FormData) {
   let sticker_quantity = 1;
 
   if (creation_mode === "variant") {
-    if (!base_container_id)
-      throw new Error("Base container is required for variant mode.");
+    if (!base_container_id) {
+      throw new Error(
+        "Base container ID is missing. The form did not send a valid parent container.",
+      );
+    }
 
     const { data: baseContainer, error: fetchError } = await supabase
       .from("containers")
@@ -34,7 +54,13 @@ export async function addContainerAction(formData: FormData) {
       .single();
 
     if (fetchError || !baseContainer) {
-      throw new Error("Could not fetch the base container configuration.");
+      console.error(
+        "[Add Container] Failed to fetch base container:",
+        fetchError,
+      );
+      throw new Error(
+        `Could not find the base container in the database (ID: ${base_container_id}). It may have been deleted.`,
+      );
     }
 
     box_id = baseContainer.box_id;
@@ -52,7 +78,6 @@ export async function addContainerAction(formData: FormData) {
     sticker_quantity = Number(formData.get("sticker_quantity")) || 1;
   }
 
-  // 🔥 NEW: SAVE base_container_id INTO DATABASE
   const { error } = await supabase.from("containers").insert({
     name,
     type,
@@ -81,14 +106,73 @@ export async function editContainerAction(formData: FormData) {
   const capacity_per_piece = Number(formData.get("capacity_per_piece"));
   const capacity_unit = formData.get("capacity_unit") as string;
   const type = formData.get("type") as string;
-  const box_id = formData.get("box_id") as string;
-  const pieces_per_box = Number(formData.get("pieces_per_box")) || 1;
-  const cap_id = formData.get("cap_id") as string;
-  const cap_quantity = Number(formData.get("cap_quantity")) || 0;
-  const sticker_id = formData.get("sticker_id") as string;
-  const sticker_quantity = Number(formData.get("sticker_quantity")) || 1;
+
+  const creation_mode = formData.get("creation_mode") as string;
+  let base_container_id = formData.get("base_container_id") as string | null;
+
+  // 🔥 FIX: Clean up potential bad data from frontend
+  if (
+    base_container_id === "null" ||
+    base_container_id === "undefined" ||
+    base_container_id === ""
+  ) {
+    base_container_id = null;
+  }
+
+  console.log(
+    "[Edit Container] Mode:",
+    creation_mode,
+    "| Base ID Received:",
+    base_container_id,
+  );
 
   const supabase = await createClient();
+
+  let box_id: string | null = null;
+  let pieces_per_box = 1;
+  let cap_id: string | null = null;
+  let cap_quantity = 0;
+  let sticker_id: string | null = null;
+  let sticker_quantity = 1;
+
+  if (creation_mode === "variant") {
+    if (!base_container_id) {
+      throw new Error(
+        "Base container ID is missing. The form did not send a valid parent container.",
+      );
+    }
+
+    const { data: baseContainer, error: fetchError } = await supabase
+      .from("containers")
+      .select("*")
+      .eq("id", base_container_id)
+      .single();
+
+    if (fetchError || !baseContainer) {
+      console.error(
+        "[Edit Container] Failed to fetch base container:",
+        fetchError,
+      );
+      throw new Error(
+        `Base container not found in the database (ID: ${base_container_id}).`,
+      );
+    }
+
+    box_id = baseContainer.box_id;
+    pieces_per_box = baseContainer.pieces_per_box || 1;
+    cap_id = baseContainer.cap_id;
+    cap_quantity = baseContainer.cap_quantity || 0;
+    sticker_id = baseContainer.sticker_id;
+    sticker_quantity = baseContainer.sticker_quantity || 1;
+  } else {
+    // STANDARD MODE
+    box_id = (formData.get("box_id") as string) || null;
+    pieces_per_box = Number(formData.get("pieces_per_box")) || 1;
+    cap_id = (formData.get("cap_id") as string) || null;
+    cap_quantity = Number(formData.get("cap_quantity")) || 0;
+    sticker_id = (formData.get("sticker_id") as string) || null;
+    sticker_quantity = Number(formData.get("sticker_quantity")) || 1;
+  }
 
   const { error } = await supabase
     .from("containers")
@@ -98,11 +182,12 @@ export async function editContainerAction(formData: FormData) {
       capacity_per_piece,
       capacity_unit,
       pieces_per_box,
-      box_id: box_id || null,
-      cap_id: cap_id || null,
+      box_id,
+      cap_id,
       cap_quantity,
       sticker_id,
       sticker_quantity,
+      base_container_id: creation_mode === "variant" ? base_container_id : null,
     })
     .eq("id", id);
 
