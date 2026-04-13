@@ -208,7 +208,7 @@ export default async function OrdersPage({
                         </div>
                       </td>
 
-                      {/* 🔥 TOTAL AMOUNT COLUMN (FORMATTED SIGN) */}
+                      
                       <td className="p-4 text-right">
                         <div
                           className={`font-black tracking-tight ${isTotalNegative ? "text-red-600" : "text-green-600"}`}
@@ -224,7 +224,7 @@ export default async function OrdersPage({
                         </div>
                       </td>
 
-                      {/* 🔥 PROFIT COLUMN (FORMATTED SIGN) */}
+                      
                       <td className="p-4 text-right">
                         <div
                           className={`font-black tracking-tight ${isProfitNegative ? "text-red-600" : "text-green-600"}`}

@@ -27,8 +27,8 @@ export default async function RawMaterialsPage({
 
   const supabase = await createClient();
 
-  let materialsData = [];
-  let transactionsData = [];
+  let materialsData: any[] = [];
+  let transactionsData: any[] = [];
   let count = 0;
 
   if (tab === "materials") {
@@ -175,19 +175,23 @@ export default async function RawMaterialsPage({
             </div>
 
             <div className="overflow-auto flex-1 bg-white">
-              <table className="erp-table w-full table-fixed min-w-[800px]">
+              <table className="erp-table w-full table-fixed min-w-[900px]">
                 <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
                   <tr>
-                    <th className="w-[30%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Material Name
                     </th>
                     <th className="w-[15%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Qty Added
                     </th>
-                    <th className="w-[15%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Rate (₹)
                     </th>
-                    <th className="w-[25%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    {/* 🔥 NEW TOTAL AMOUNT COLUMN 🔥 */}
+                    <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                      Total (₹)
+                    </th>
+                    <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Supplier Details
                     </th>
                     <th className="w-[15%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
@@ -197,35 +201,49 @@ export default async function RawMaterialsPage({
                 </thead>
                 <tbody>
                   {transactionsData.length ? (
-                    transactionsData.map((txn) => (
-                      <tr
-                        key={txn.id}
-                        className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
-                      >
-                        <td className="p-4 font-semibold text-[var(--lub-dark)]">
-                          {txn.materials?.name}
-                        </td>
-                        <td className="p-4 text-center font-bold text-green-600">
-                          +{Math.round(Number(txn.quantity))}{" "}
-                          <span className="text-xs font-normal text-gray-400">
-                            {txn.materials?.unit}
-                          </span>
-                        </td>
-                        <td className="p-4 text-center font-medium text-gray-700">
-                          ₹{Number(txn.rate).toFixed(2)}
-                        </td>
-                        <td className="p-4 text-xs text-gray-500 truncate">
-                          {txn.reason}
-                        </td>
-                        <td className="p-4 text-sm text-gray-600 text-right">
-                          {new Date(txn.created_at).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))
+                    transactionsData.map((txn) => {
+                      // Do the math right here!
+                      const totalAmount =
+                        Number(txn.quantity) * Number(txn.rate);
+
+                      return (
+                        <tr
+                          key={txn.id}
+                          className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors"
+                        >
+                          <td className="p-4 text-left font-semibold text-[var(--lub-dark)]">
+                            {txn.materials?.name}
+                          </td>
+                          <td className="p-4 text-center font-bold text-green-600">
+                            +{Math.round(Number(txn.quantity))}{" "}
+                            <span className="text-xs font-normal text-gray-400">
+                              {txn.materials?.unit}
+                            </span>
+                          </td>
+                          <td className="p-4 text-right font-medium text-gray-700">
+                            ₹{Number(txn.rate).toFixed(2)}
+                          </td>
+                          {/* 🔥 NEW TOTAL AMOUNT CELL 🔥 */}
+                          <td className="p-4 text-right font-black text-gray-800">
+                            ₹
+                            {totalAmount.toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="p-4 text-left text-xs text-gray-500 truncate">
+                            {txn.reason}
+                          </td>
+                          <td className="p-4 text-sm text-gray-600 text-right">
+                            {new Date(txn.created_at).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="text-center py-20 text-gray-400"
                       >
                         No purchase history found.
