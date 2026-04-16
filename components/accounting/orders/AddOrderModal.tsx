@@ -8,6 +8,7 @@ export default function AddOrderModal({
   finishedProducts,
   containers,
   materials,
+  stickers, // 🔥 NEW PROP FOR STICKERS
 }: {
   finishedProducts: {
     id: string;
@@ -26,13 +27,17 @@ export default function AddOrderModal({
     cost_per_piece?: number;
     box_id?: string;
     cap_id?: string;
-    sticker_id?: string;
     cap_quantity?: number;
-    sticker_quantity?: number;
   }[];
   materials: {
     id: string;
     cost_per_unit?: number;
+  }[];
+  stickers: {
+    id: string;
+    name: string;
+    cost_per_unit?: number;
+    stock: number;
   }[];
 }) {
   const router = useRouter();
@@ -45,10 +50,14 @@ export default function AddOrderModal({
   const [boxesQty, setBoxesQty] = useState<number | "">("");
   const [rate, setRate] = useState<number | "">("");
 
+  // 🔥 Sticker state (only ID needed now, quantity defaults to 1)
+  const [selectedStickerId, setSelectedStickerId] = useState("");
+
   const selectedFP = finishedProducts.find((fp) => fp.id === selectedProductId);
   const selectedContainer = containers.find(
     (c) => c.id === selectedContainerId,
   );
+  const selectedSticker = stickers.find((s) => s.id === selectedStickerId);
 
   const piecesPerBox = selectedContainer?.pieces_per_box || 1;
   const totalPieces = (Number(boxesQty) || 0) * piecesPerBox;
@@ -68,22 +77,22 @@ export default function AddOrderModal({
       totalPieces * (selectedContainer.cost_per_piece || 0);
 
     const reqBoxes = Number(boxesQty);
-    const reqStickers = totalPieces * (selectedContainer.sticker_quantity || 0);
     const reqCaps = totalPieces * (selectedContainer.cap_quantity || 0);
+
+    // 🔥 Hardcoded to 1 sticker per piece!
+    const reqStickers = selectedStickerId ? totalPieces * 1 : 0;
 
     const boxPrice =
       materials?.find((m) => m.id === selectedContainer.box_id)
         ?.cost_per_unit || 0;
-    const stickerPrice =
-      materials?.find((m) => m.id === selectedContainer.sticker_id)
-        ?.cost_per_unit || 0;
     const capPrice =
       materials?.find((m) => m.id === selectedContainer.cap_id)
         ?.cost_per_unit || 0;
+    const stickerPrice = selectedSticker?.cost_per_unit || 0;
 
     const boxCost = reqBoxes * boxPrice;
-    const stickerCost = reqStickers * stickerPrice;
     const capCost = reqCaps * capPrice;
+    const stickerCost = reqStickers * stickerPrice;
 
     totalCost =
       totalOilCost + totalBottleCost + boxCost + stickerCost + capCost;
@@ -115,6 +124,7 @@ export default function AddOrderModal({
       setRate("");
       setSelectedProductId("");
       setSelectedContainerId("");
+      setSelectedStickerId("");
       router.refresh();
     } catch (error: any) {
       console.error(error);
@@ -124,7 +134,6 @@ export default function AddOrderModal({
     }
   }
 
-  // --- STYLES FOR THE GLASSY MODAL UI ---
   const glassBackdrop =
     "fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[60] p-4 text-left";
   const glassModal =
@@ -256,6 +265,46 @@ export default function AddOrderModal({
                     </select>
                   </div>
 
+                  {/* 🔥 STICKER SELECTION AREA */}
+                  <div className="md:col-span-2 flex gap-4 bg-white p-4 border border-gray-100 rounded-2xl shadow-sm">
+                    <div className="flex-1">
+                      <label className={labelClass}>
+                        Sticker / Label Design
+                      </label>
+                      <select
+                        name="sticker_id"
+                        className={glassInput}
+                        value={selectedStickerId}
+                        onChange={(e) => setSelectedStickerId(e.target.value)}
+                      >
+                        <option value="">-- No Sticker Needed --</option>
+                        {stickers.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} ({s.stock} in stock)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 🔥 HIDDEN STICKER QUANTITY (DEFAULT 1) */}
+                    {selectedStickerId && (
+                      <input type="hidden" name="sticker_quantity" value="1" />
+                    )}
+
+                    {/* 🔥 COMMENTED OUT STICKER QUANTITY FIELD
+                    <div className="w-24 shrink-0">
+                      <label className={labelClass}>Stickers/Pc</label>
+                      <input
+                        type="number"
+                        className={glassInput}
+                        min="1"
+                        value={1}
+                        disabled={true}
+                      />
+                    </div>
+                    */}
+                  </div>
+
                   <div>
                     <label className={labelClass}>Quantity (Boxes)</label>
                     <input
@@ -294,7 +343,6 @@ export default function AddOrderModal({
                   </div>
                 </div>
 
-                {/* 🔥 MAGIC GREEN PROFIT BOX 🔥 */}
                 {selectedProductId &&
                 selectedContainerId &&
                 boxesQty &&
@@ -319,7 +367,6 @@ export default function AddOrderModal({
                       <span
                         className={`font-black text-2xl tracking-tight ${estimatedProfit >= 0 ? "text-green-700" : "text-red-600"}`}
                       >
-                        {/* 🔥 FIXED MINUS SIGN FORMATTING 🔥 */}
                         {estimatedProfit < 0 ? "- ₹" : "₹"}
                         {Math.abs(estimatedProfit).toLocaleString("en-IN", {
                           minimumFractionDigits: 2,

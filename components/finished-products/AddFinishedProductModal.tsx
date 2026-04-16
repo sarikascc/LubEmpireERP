@@ -115,7 +115,7 @@ export default function AddFinishedProductModal() {
                   <label className={labelClass}>Bulk Storage Unit</label>
                   <select className={glassInput} name="unit" required>
                     <option value="Ltr">Liter (Ltr)</option>
-                    <option value="KG">Kilogram (KG)</option>
+                    <option value="KG">Kilogram (Kg)</option>
                   </select>
                 </div>
               </div>

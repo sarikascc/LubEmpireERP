@@ -4,13 +4,30 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteOrderAction, editOrderAction } from "@/app/actions/orders";
 
-export default function OrderRowActions({ order }: { order: any }) {
+export default function OrderRowActions({
+  order,
+  stickers,
+}: {
+  order: any;
+  stickers: {
+    id: string;
+    name: string;
+    cost_per_unit?: number;
+    stock: number;
+    type?: string;
+  }[];
+}) {
   const router = useRouter();
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+
+  // 🔥 Sticker state (only ID needed now)
+  const [selectedStickerId, setSelectedStickerId] = useState(
+    order.sticker_id || "",
+  );
 
   const handleDeleteSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -45,7 +62,7 @@ export default function OrderRowActions({ order }: { order: any }) {
   const glassBackdrop =
     "fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[60] p-4 text-left";
   const glassModal =
-    "bg-white/70 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-2xl w-full max-w-md overflow-hidden";
+    "bg-white/70 backdrop-blur-xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.1)] rounded-2xl w-full max-w-lg overflow-hidden";
   const glassInput =
     "input-field !bg-white/50 !border-white/60 focus:!bg-white/90 focus:!border-[var(--lub-gold)] shadow-sm w-full";
 
@@ -77,7 +94,7 @@ export default function OrderRowActions({ order }: { order: any }) {
       <button
         onClick={() => setIsEditOpen(true)}
         className="p-2 text-gray-400 hover:text-[var(--lub-gold)] transition-colors"
-        title="Edit Order Quantities"
+        title="Edit Order"
       >
         <svg
           className="w-5 h-5"
@@ -144,7 +161,6 @@ export default function OrderRowActions({ order }: { order: any }) {
                 <label className="block text-sm font-bold text-gray-700 mb-1.5">
                   Customer Name
                 </label>
-                {/* UNLOCKED INPUT HERE */}
                 <input
                   className={glassInput}
                   type="text"
@@ -152,6 +168,46 @@ export default function OrderRowActions({ order }: { order: any }) {
                   defaultValue={order.customer_name}
                   required
                 />
+              </div>
+
+              {/* 🔥 STICKER SELECTION AREA IN EDIT MODAL */}
+              <div className="flex gap-4 bg-white/40 p-4 border border-white/60 rounded-2xl shadow-sm">
+                <div className="flex-1">
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">
+                    Sticker / Label Design
+                  </label>
+                  <select
+                    name="sticker_id"
+                    className={glassInput}
+                    value={selectedStickerId}
+                    onChange={(e) => setSelectedStickerId(e.target.value)}
+                  >
+                    <option value="">-- No Sticker Needed --</option>
+                    {stickers.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.stock} in stock)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 🔥 HIDDEN STICKER QUANTITY (DEFAULT 1) */}
+                {selectedStickerId && (
+                  <input type="hidden" name="sticker_quantity" value="1" />
+                )}
+
+                {/* 🔥 COMMENTED OUT STICKER QUANTITY FIELD 
+                <div className="w-24 shrink-0">
+                  <label className="block text-sm font-bold text-gray-700 mb-1.5">Qty / Pc</label>
+                  <input
+                    type="number"
+                    className={glassInput}
+                    min="1"
+                    value={1}
+                    disabled={true}
+                  />
+                </div>
+                */}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -215,7 +271,7 @@ export default function OrderRowActions({ order }: { order: any }) {
       {/* ================= DELETE MODAL ================= */}
       {isDeleteOpen && (
         <div className={`${glassBackdrop} text-center`}>
-          <div className={`${glassModal} p-8`}>
+          <div className={`${glassModal} p-8 !max-w-sm`}>
             <div className="w-16 h-16 bg-red-50/80 backdrop-blur-sm border border-red-100 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-inner">
               <svg
                 className="w-8 h-8"

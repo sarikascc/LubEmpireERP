@@ -140,7 +140,10 @@ export default async function RawMaterialsPage({
                         <td
                           className={`p-4 text-center font-bold ${material.stock <= 0 ? "text-red-500" : "text-green-600"}`}
                         >
-                          {Math.round(Number(material.stock))}{" "}
+                          {/* 🔥 Removed Math.round(), now formatting to 2 decimal places max */}
+                          {Number(material.stock).toLocaleString("en-IN", {
+                            maximumFractionDigits: 2,
+                          })}{" "}
                           <span className="text-xs font-normal text-gray-500">
                             {material.unit}
                           </span>
@@ -217,7 +220,10 @@ export default async function RawMaterialsPage({
                             {txn.materials?.name}
                           </td>
                           <td className="p-4 text-right font-bold text-green-600">
-                            +{Math.round(Number(txn.quantity))}{" "}
+                            {/* 🔥 Removed Math.round() here too */}+
+                            {Number(txn.quantity).toLocaleString("en-IN", {
+                              maximumFractionDigits: 2,
+                            })}{" "}
                             <span className="text-xs font-normal text-gray-400">
                               {txn.materials?.unit}
                             </span>
@@ -239,7 +245,6 @@ export default async function RawMaterialsPage({
                             {new Date(txn.created_at).toLocaleDateString()}
                           </td>
                           <td className="p-4 text-right">
-                            {/* 🔥 ALWAYS SHOW EDIT BUTTON NOW */}
                             <EditStockInModal transaction={txn} />
                           </td>
                         </tr>

@@ -6,12 +6,10 @@ import { addContainerAction } from "@/app/actions/containers";
 
 export default function AddContainerModal({
   boxes,
-  stickers,
   caps,
   existingContainers,
 }: {
   boxes: { id: string; name: string }[];
-  stickers: { id: string; name: string }[];
   caps: { id: string; name: string }[];
   existingContainers?: {
     id: string;
@@ -19,7 +17,7 @@ export default function AddContainerModal({
     capacity_per_piece: number;
     capacity_unit: string;
     type?: string;
-    base_container_id?: string | null; // 🔥 ADDED: Type definition for the base id
+    base_container_id?: string | null;
   }[];
 }) {
   const router = useRouter();
@@ -37,7 +35,6 @@ export default function AddContainerModal({
   const [selectedBaseContainer, setSelectedBaseContainer] = useState("");
   const [selectedBox, setSelectedBox] = useState("");
   const [selectedCap, setSelectedCap] = useState("");
-  const [selectedSticker, setSelectedSticker] = useState("");
   const [piecesPerBox, setPiecesPerBox] = useState<number | "">(1);
 
   // 🔥 BULLETPROOF FILTERING: Strictly separate Bottles/Buckets AND completely hide Variants
@@ -77,7 +74,6 @@ export default function AddContainerModal({
       setSelectedBaseContainer("");
       setSelectedBox("");
       setSelectedCap("");
-      setSelectedSticker("");
       setPiecesPerBox(1);
 
       router.refresh();
@@ -213,7 +209,6 @@ export default function AddContainerModal({
                           setCreationMode("variant");
                           setSelectedBox("");
                           setSelectedCap("");
-                          setSelectedSticker("");
                         }}
                         className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
                           creationMode === "variant"
@@ -308,14 +303,14 @@ export default function AddContainerModal({
                         required
                       >
                         <option value="Ltr">Ltr</option>
-                        <option value="ml">ml</option>
-                        <option value="KG">KG</option>
-                        <option value="gm">gm</option>
+                        <option value="ml">Ml</option>
+                        <option value="KG">Kg</option>
+                        <option value="gm">Gm</option>
                       </select>
                     </div>
                   </div>
 
-                  {/* --- CONDITIONALLY RENDER BOX/CAP/STICKER ONLY IF "CUSTOM" --- */}
+                  {/* --- CONDITIONALLY RENDER BOX/CAP ONLY IF "CUSTOM" --- */}
                   {creationMode === "custom" && (
                     <>
                       {/* --- 2. MASTER BOX (BOTTLES ONLY) --- */}
@@ -400,44 +395,6 @@ export default function AddContainerModal({
                           </div>
                         </div>
                       )}
-
-                      {/* --- 4. STICKER (MANDATORY FOR CUSTOM) --- */}
-                      <div className="md:col-span-2 flex items-start gap-4 p-5 bg-white rounded-2xl shadow-sm border border-gray-100">
-                        <div className="flex-1">
-                          <label className={labelClass}>
-                            Sticker / Label{" "}
-                            <span className="text-red-500">*</span>
-                          </label>
-                          <select
-                            className={`${glassInput} w-full`}
-                            name="sticker_id"
-                            required
-                            value={selectedSticker}
-                            onChange={(e) => setSelectedSticker(e.target.value)}
-                          >
-                            <option value="">
-                              -- Select Mandatory Sticker --
-                            </option>
-                            {stickers.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="w-24 shrink-0">
-                          <label className={labelClass}>Qty</label>
-                          <input
-                            className={`${glassInput} w-full`}
-                            type="number"
-                            name="sticker_quantity"
-                            min="1"
-                            defaultValue={1}
-                            required
-                            onKeyDown={blockInvalidChars}
-                          />
-                        </div>
-                      </div>
                     </>
                   )}
                 </div>
@@ -455,7 +412,7 @@ export default function AddContainerModal({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 py-3 px-4 bg-[var(--lub-gold)] text-white font-bold rounded-xl shadow-md hover:brightness-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                  className="flex-[2] py-3 px-4 bg-[var(--lub-gold)] text-white font-bold rounded-xl shadow-md hover:brightness-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
                 >
                   {isSubmitting ? (
                     <>

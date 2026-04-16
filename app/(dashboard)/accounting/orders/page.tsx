@@ -32,7 +32,8 @@ export default async function OrdersPage({
       `
       *,
       finished_products (product_name, grade_name, unit),
-      containers (name, pieces_per_box)
+      containers (name, pieces_per_box),
+      materials (name)
     `,
       { count: "exact" },
     )
@@ -69,13 +70,17 @@ export default async function OrdersPage({
   const { data: containersList } = await supabase
     .from("containers")
     .select(
-      "id, name, pieces_per_box, capacity_per_piece, capacity_unit, cost_per_piece, box_id, sticker_id, cap_id, cap_quantity, sticker_quantity",
+      "id, name, pieces_per_box, capacity_per_piece, capacity_unit, cost_per_piece, box_id, cap_id, cap_quantity",
     )
     .order("name");
 
-  const { data: materials } = await supabase
+  // 🔥 FETCH FULL MATERIALS TO EXTRACT STICKERS
+  const { data: materialsData } = await supabase
     .from("materials")
-    .select("id, cost_per_unit");
+    .select("id, name, cost_per_unit, stock, type");
+
+  const materials = materialsData || [];
+  const stickers = materials.filter((m) => m.type === "Sticker");
 
   const buildPaginationUrl = (newPage: number) => {
     const params = new URLSearchParams();
@@ -95,38 +100,42 @@ export default async function OrdersPage({
             <AddOrderModal
               finishedProducts={finishedProducts || []}
               containers={containersList || []}
-              materials={materials || []}
+              materials={materials}
+              stickers={stickers} // 🔥 PASSED STICKERS HERE
             />
           </div>
         </div>
 
         <div className="overflow-auto flex-1 bg-white">
-          <table className="erp-table w-full table-fixed min-w-[1000px]">
+          <table className="erp-table w-full table-fixed min-w-[1100px]">
             <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
               <tr>
-                <th className="w-[16%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                <th className="w-[14%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Order Number
                 </th>
                 <th className="w-[10%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                  Order Date
+                  Date
                 </th>
-                <th className="w-[18%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                  Customer Name
+                <th className="w-[16%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Customer
                 </th>
-                <th className="w-[18%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                  Product Details
+                <th className="w-[16%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Product
+                </th>
+                {/* 🔥 NEW STICKER COLUMN */}
+                <th className="w-[12%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Sticker
                 </th>
                 <th className="w-[8%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                  Qty
+                  Qty (boxes/bkt)
                 </th>
-                <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                <th className="w-[8%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Rate
                 </th>
-                <th className="w-[12%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                  Total Amount
+                <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                  Total
                 </th>
-                {/* 🔥 PROFIT COLUMN HEADER */}
-                <th className="w-[12%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                   Est. Profit
                 </th>
                 <th className="w-[8%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
@@ -144,7 +153,6 @@ export default async function OrdersPage({
                   const paddedNum = String(order.order_number).padStart(4, "0");
                   const formattedOrderId = `ORD-${yyyy}${mm}${dd}-${paddedNum}`;
 
-                  // Determine if total amount and profit are negative to display properly
                   const isTotalNegative = Number(order.total_amount) < 0;
                   const isProfitNegative = Number(order.calculated_profit) < 0;
 
@@ -181,6 +189,25 @@ export default async function OrdersPage({
                           Pack: {order.containers?.name}
                         </div>
                       </td>
+
+                      {/* 🔥 STICKER DATA CELL */}
+                      <td className="p-4">
+                        {order.sticker_id ? (
+                          <>
+                            <div className="font-semibold text-gray-700 text-[13px] truncate">
+                              {order.materials?.name || "Unknown Sticker"}
+                            </div>
+                            <div className="text-xs text-blue-500 font-medium mt-0.5">
+                              {order.sticker_quantity} pcs / bottle
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-1 rounded-md border border-gray-200">
+                            No Sticker
+                          </span>
+                        )}
+                      </td>
+
                       <td className="p-4 text-center">
                         <div className="font-bold text-gray-800">
                           {order.boxes_quantity}
@@ -208,7 +235,6 @@ export default async function OrdersPage({
                         </div>
                       </td>
 
-                      
                       <td className="p-4 text-right">
                         <div
                           className={`font-black tracking-tight ${isTotalNegative ? "text-red-600" : "text-green-600"}`}
@@ -224,7 +250,6 @@ export default async function OrdersPage({
                         </div>
                       </td>
 
-                      
                       <td className="p-4 text-right">
                         <div
                           className={`font-black tracking-tight ${isProfitNegative ? "text-red-600" : "text-green-600"}`}
@@ -240,7 +265,8 @@ export default async function OrdersPage({
                       </td>
 
                       <td className="p-4 text-center">
-                        <OrderRowActions order={order} />
+                        {/* 🔥 PASSED STICKERS TO EDIT ACTION */}
+                        <OrderRowActions order={order} stickers={stickers} />
                       </td>
                     </tr>
                   );
@@ -248,7 +274,7 @@ export default async function OrdersPage({
               ) : (
                 <tr>
                   <td
-                    colSpan={9} // 🔥 Updated to 9 because we added the Profit column
+                    colSpan={10}
                     className="text-center py-20 text-gray-400 font-medium"
                   >
                     No sales orders found matching your filters.

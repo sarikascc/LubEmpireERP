@@ -5,6 +5,7 @@ import FinishedProductRowActions from "@/components/finished-products/FinishedPr
 import ProductionEntryModal from "@/components/finished-products/ProductionEntryModal";
 import FinishedProductFilters from "@/components/finished-products/FinishedProductFilters";
 import ProductionLogInfoModal from "@/components/finished-products/ProductionLogInfoModal";
+import EditProductionEntryModal from "@/components/finished-products/EditProductionEntryModal"; // 🔥 UPDATED IMPORT
 
 export default async function FinishedProductsPage({
   searchParams,
@@ -53,6 +54,7 @@ export default async function FinishedProductsPage({
         *, 
         finished_products!inner(product_name, grade_name, unit),
         production_material_consumption (
+          raw_material_id,
           quantity_used,
           materials (name, unit)
         )
@@ -199,7 +201,6 @@ export default async function FinishedProductsPage({
               <table className="erp-table w-full table-fixed min-w-[800px]">
                 <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
                   <tr>
-                    {/* 🔥 ALIGNED WIDTHS FOR PERFECT SPACING */}
                     <th className="w-[30%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Product Manufactured
                     </th>
@@ -243,14 +244,21 @@ export default async function FinishedProductsPage({
                           </div>
                         </td>
 
-                        {/* Date centered for perfect spacing */}
                         <td className="p-4 text-sm font-medium text-gray-600 text-center">
                           {new Date(log.created_at).toLocaleDateString()}
                         </td>
 
-                        {/* Actions column beautifully aligned */}
                         <td className="p-4 text-center">
-                          <ProductionLogInfoModal log={log} />
+                          {/* 🔥 ALIGNED ACTIONS SIDE-BY-SIDE 🔥 */}
+                          <div className="flex items-center justify-center gap-1">
+                            <ProductionLogInfoModal log={log} />
+                            {/* 🔥 MOUNTING THE NEW MODAL WITH PROPS */}
+                            <EditProductionEntryModal
+                              log={log}
+                              finishedProducts={allFinishedProducts || []}
+                              rawMaterials={allRawMaterials || []}
+                            />
+                          </div>
                         </td>
                       </tr>
                     ))

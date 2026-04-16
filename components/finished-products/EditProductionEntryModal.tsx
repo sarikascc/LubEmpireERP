@@ -2,35 +2,46 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addProductionEntryAction } from "@/app/actions/finishedProducts";
+import { editProductionEntryAction } from "@/app/actions/finishedProducts";
 
-export default function ProductionEntryModal({
+export default function EditProductionEntryModal({
+  log,
   finishedProducts,
   rawMaterials,
 }: {
-  finishedProducts: {
-    id: string;
-    product_name: string;
-    grade_name: string;
-    unit: string;
-  }[];
-  rawMaterials: { id: string; name: string; unit: string; stock: number }[];
+  log: any;
+  finishedProducts: any[];
+  rawMaterials: any[];
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState("");
 
-  const [rows, setRows] = useState([
-    { material_id: "", quantity: "", input_unit: "" },
-  ]);
+  // Pre-fill with existing log data
+  const [selectedProduct, setSelectedProduct] = useState(
+    log.finished_product_id,
+  );
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Map the existing consumptions to the rows state
+  const [rows, setRows] = useState(() => {
+    if (
+      log.production_material_consumption &&
+      log.production_material_consumption.length > 0
+    ) {
+      return log.production_material_consumption.map((c: any) => ({
+        material_id: c.raw_material_id,
+        quantity: c.quantity_used.toString(),
+        input_unit: c.materials?.unit || "",
+      }));
+    }
+    return [{ material_id: "", quantity: "", input_unit: "" }];
+  });
 
   const activeProduct = finishedProducts.find((p) => p.id === selectedProduct);
 
-  const addRow = () => {
+  const addRow = () =>
     setRows([...rows, { material_id: "", quantity: "", input_unit: "" }]);
-  };
 
   const removeRow = (index: number) => {
     const newRows = [...rows];
@@ -45,13 +56,10 @@ export default function ProductionEntryModal({
   ) => {
     const newRows = [...rows];
     newRows[index][field] = value;
-
-    // Auto-set the default unit when a material is selected
     if (field === "material_id") {
       const mat = rawMaterials.find((m) => m.id === value);
       newRows[index].input_unit = mat?.unit || "";
     }
-
     setRows(newRows);
   };
 
@@ -62,30 +70,34 @@ export default function ProductionEntryModal({
 
     try {
       const validRows = rows.filter(
-        (r) => r.material_id !== "" && r.quantity !== "",
+        (r: any) => r.material_id !== "" && r.quantity !== "",
       );
       if (validRows.length === 0)
         throw new Error("Please add at least one raw material.");
 
-      // 🔥 CONVERT GRAMS TO KG AND ML TO LTR BEFORE SENDING TO BACKEND
-      const processedRows = validRows.map((r) => {
+      // 🔥 AUTO-CONVERT UNITS (Now supporting Grams, Gm, ml, Ml)
+      const processedRows = validRows.map((r: any) => {
         let finalQty = Number(r.quantity);
-        if (r.input_unit === "Grams" || r.input_unit === "Gram") {
-          finalQty = finalQty / 1000;
-        } else if (r.input_unit === "ml" || r.input_unit === "ML") {
+        const unitLower = r.input_unit?.toLowerCase();
+
+        if (
+          unitLower === "grams" ||
+          unitLower === "gram" ||
+          unitLower === "gm" ||
+          unitLower === "ml"
+        ) {
           finalQty = finalQty / 1000;
         }
         return { material_id: r.material_id, quantity: finalQty };
       });
 
       const formData = new FormData(e.currentTarget);
+      formData.append("log_id", log.id);
       formData.set("raw_materials", JSON.stringify(processedRows));
 
-      await addProductionEntryAction(formData);
+      await editProductionEntryAction(formData);
 
       setIsOpen(false);
-      setSelectedProduct("");
-      setRows([{ material_id: "", quantity: "", input_unit: "" }]);
       router.refresh();
     } catch (err: any) {
       setErrorMsg(err.message || "An error occurred.");
@@ -98,7 +110,7 @@ export default function ProductionEntryModal({
   const glassBackdrop =
     "fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[60] p-4 text-left";
   const glassModal =
-    "bg-[#f4f6f8] shadow-2xl rounded-2xl w-full max-w-3xl flex flex-col overflow-hidden font-sans border border-white";
+    "bg-[#f4f6f8] shadow-2xl rounded-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden font-sans border border-white";
   const inputClass =
     "w-full p-3 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all shadow-sm";
   const labelClass =
@@ -130,9 +142,28 @@ export default function ProductionEntryModal({
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="h-[38px] px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors shadow-sm shrink-0 flex items-center justify-center gap-2"
+        className="p-1.5 text-gray-400 hover:text-[#2563eb] transition-colors focus:outline-none"
+        title="Edit Production"
       >
-        Production Entry
+        <svg
+          className="w-5 h-5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+          />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+          />
+        </svg>
       </button>
 
       {isOpen && (
@@ -143,7 +174,7 @@ export default function ProductionEntryModal({
           <div className={glassModal} onClick={(e) => e.stopPropagation()}>
             <div className="px-8 py-5 flex justify-between items-center border-b border-gray-200/60 bg-white/50 shrink-0">
               <h2 className="text-[17px] font-extrabold text-[#1e293b]">
-                Production Entry
+                Edit Production Entry
               </h2>
               <button
                 onClick={() => setIsOpen(false)}
@@ -164,7 +195,6 @@ export default function ProductionEntryModal({
                   </div>
                 )}
 
-                {/* Top Section */}
                 <div className="flex flex-col md:flex-row gap-5">
                   <div className="flex-1">
                     <label className={labelClass}>Finished Product</label>
@@ -195,6 +225,7 @@ export default function ProductionEntryModal({
                         min="0.1"
                         name="quantity_produced"
                         required
+                        defaultValue={log.quantity_produced}
                         disabled={!selectedProduct}
                       />
                       <span className="text-sm font-bold text-gray-500 w-8">
@@ -204,7 +235,6 @@ export default function ProductionEntryModal({
                   </div>
                 </div>
 
-                {/* Raw Material Section */}
                 <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm space-y-5">
                   <div className="flex justify-between items-center pb-2 border-b border-gray-50">
                     <h3 className="text-[13px] font-extrabold text-[#1e293b] uppercase tracking-wider">
@@ -219,7 +249,7 @@ export default function ProductionEntryModal({
                     </button>
                   </div>
 
-                  {rows.map((row, index) => {
+                  {rows.map((row: any, index: any) => {
                     const activeRawMaterial = rawMaterials.find(
                       (rm) => rm.id === row.material_id,
                     );
@@ -247,18 +277,13 @@ export default function ProductionEntryModal({
                           >
                             <option value="">-- Select Raw Material --</option>
                             {rawMaterials.map((rm) => (
-                              <option
-                                key={rm.id}
-                                value={rm.id}
-                                disabled={rm.stock <= 0}
-                              >
+                              <option key={rm.id} value={rm.id}>
                                 {rm.name} (Max: {Number(rm.stock).toFixed(2)}{" "}
                                 {rm.unit})
                               </option>
                             ))}
                           </select>
                         </div>
-
                         <div className="w-32 shrink-0">
                           <label className={labelClass}>Qty Used</label>
                           <input
@@ -274,8 +299,6 @@ export default function ProductionEntryModal({
                             disabled={!row.material_id}
                           />
                         </div>
-
-                        {/* Dynamic Unit Dropdown (ml / Ltr / gm / KG) */}
                         <div className="w-24 shrink-0 pt-6">
                           {isKg ? (
                             <select
@@ -289,8 +312,8 @@ export default function ProductionEntryModal({
                                 )
                               }
                             >
-                              <option value="KG">Kg</option>
-                              <option value="Grams">Gm</option>
+                              <option value="Kg">Kg</option>
+                              <option value="Gm">Gm</option>
                             </select>
                           ) : isLtr ? (
                             <select
@@ -305,7 +328,7 @@ export default function ProductionEntryModal({
                               }
                             >
                               <option value="Ltr">Ltr</option>
-                              <option value="ml">Ml</option>
+                              <option value="Ml">Ml</option>
                             </select>
                           ) : (
                             <div className="text-sm font-bold text-gray-500 w-full px-2">
@@ -359,10 +382,10 @@ export default function ProductionEntryModal({
                 >
                   {isSubmitting ? (
                     <>
-                      <Spinner /> Logging...
+                      <Spinner /> Saving...
                     </>
                   ) : (
-                    "Log Production"
+                    "Save Changes"
                   )}
                 </button>
               </div>

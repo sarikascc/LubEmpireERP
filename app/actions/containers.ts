@@ -27,8 +27,6 @@ export async function addContainerAction(formData: FormData) {
   let pieces_per_box = 1;
   let cap_id: string | null = null;
   let cap_quantity = 0;
-  let sticker_id: string | null = null;
-  let sticker_quantity = 1;
 
   if (creation_mode === "variant") {
     if (!base_container_id) {
@@ -39,9 +37,7 @@ export async function addContainerAction(formData: FormData) {
 
     const { data: baseContainer, error: fetchError } = await supabase
       .from("containers")
-      .select(
-        "box_id, pieces_per_box, cap_id, cap_quantity, sticker_id, sticker_quantity",
-      )
+      .select("box_id, pieces_per_box, cap_id, cap_quantity")
       .eq("id", base_container_id)
       .single();
 
@@ -55,15 +51,11 @@ export async function addContainerAction(formData: FormData) {
     pieces_per_box = baseContainer.pieces_per_box || 1;
     cap_id = baseContainer.cap_id;
     cap_quantity = baseContainer.cap_quantity || 0;
-    sticker_id = baseContainer.sticker_id;
-    sticker_quantity = baseContainer.sticker_quantity || 1;
   } else {
     box_id = (formData.get("box_id") as string) || null;
     pieces_per_box = Number(formData.get("pieces_per_box")) || 1;
     cap_id = (formData.get("cap_id") as string) || null;
     cap_quantity = Number(formData.get("cap_quantity")) || 0;
-    sticker_id = (formData.get("sticker_id") as string) || null;
-    sticker_quantity = Number(formData.get("sticker_quantity")) || 1;
   }
 
   const { error } = await supabase.from("containers").insert({
@@ -76,8 +68,6 @@ export async function addContainerAction(formData: FormData) {
     box_id,
     cap_id,
     cap_quantity,
-    sticker_id,
-    sticker_quantity,
     base_container_id: creation_mode === "variant" ? base_container_id : null,
   });
 
@@ -113,8 +103,6 @@ export async function editContainerAction(formData: FormData) {
   let pieces_per_box = 1;
   let cap_id: string | null = null;
   let cap_quantity = 0;
-  let sticker_id: string | null = null;
-  let sticker_quantity = 1;
 
   if (creation_mode === "variant") {
     if (!base_container_id) {
@@ -139,16 +127,12 @@ export async function editContainerAction(formData: FormData) {
     pieces_per_box = baseContainer.pieces_per_box || 1;
     cap_id = baseContainer.cap_id;
     cap_quantity = baseContainer.cap_quantity || 0;
-    sticker_id = baseContainer.sticker_id;
-    sticker_quantity = baseContainer.sticker_quantity || 1;
   } else {
     // STANDARD MODE
     box_id = (formData.get("box_id") as string) || null;
     pieces_per_box = Number(formData.get("pieces_per_box")) || 1;
     cap_id = (formData.get("cap_id") as string) || null;
     cap_quantity = Number(formData.get("cap_quantity")) || 0;
-    sticker_id = (formData.get("sticker_id") as string) || null;
-    sticker_quantity = Number(formData.get("sticker_quantity")) || 1;
   }
 
   const { error } = await supabase
@@ -162,8 +146,6 @@ export async function editContainerAction(formData: FormData) {
       box_id,
       cap_id,
       cap_quantity,
-      sticker_id,
-      sticker_quantity,
       base_container_id: creation_mode === "variant" ? base_container_id : null,
     })
     .eq("id", id);
@@ -296,7 +278,7 @@ export async function adjustContainerAction(formData: FormData) {
   revalidatePath("/materials/containers");
 }
 
-// 🔥 NEW: Edit Existing Purchase (Allows editing used stock, blocks negative inventory)
+// 🔥 Edit Existing Purchase (Allows editing used stock, blocks negative inventory)
 export async function editContainerPurchaseAction(formData: FormData) {
   const transaction_id = formData.get("transaction_id") as string;
   const new_quantity = Number(formData.get("quantity"));

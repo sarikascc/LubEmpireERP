@@ -176,3 +176,176 @@ export async function addProductionEntryAction(formData: FormData) {
 
   revalidatePath("/finished-products");
 }
+
+// 🔥 NEW: Fully Edit a Production Entry (Reverses old materials, applies new materials & yields)
+export async function editProductionEntryAction(formData: FormData) {
+  const log_id = formData.get("log_id") as string;
+  const new_fp_id = formData.get("finished_product_id") as string;
+  const new_qty_produced = Number(formData.get("quantity_produced"));
+
+  const rawMaterialsJSON = formData.get("raw_materials") as string;
+  const new_consumed_materials = JSON.parse(rawMaterialsJSON) as {
+    material_id: string;
+    quantity: number;
+  }[];
+
+  const supabase = await createClient();
+
+  // 1. Fetch old log & old consumptions
+  const { data: oldLog } = await supabase
+    .from("production_logs")
+    .select("*")
+    .eq("id", log_id)
+    .single();
+  if (!oldLog) throw new Error("Log not found");
+
+  const { data: oldConsumptions } = await supabase
+    .from("production_material_consumption")
+    .select("*")
+    .eq("production_log_id", log_id);
+
+  // 2. CHECK SAFETY LIMITS BEFORE REVERSING
+  if (oldLog.finished_product_id === new_fp_id) {
+    // If it's the same product, just check the net difference
+    const delta = new_qty_produced - Number(oldLog.quantity_produced);
+    const { data: fp } = await supabase
+      .from("finished_products")
+      .select("stock")
+      .eq("id", new_fp_id)
+      .single();
+    if (Number(fp?.stock || 0) + delta < 0) {
+      throw new Error(
+        "Cannot lower yield this much. The oil from this batch has already been sold!",
+      );
+    }
+  } else {
+    // If changing to a completely different product, the old product must survive a full reversal
+    const { data: oldFp } = await supabase
+      .from("finished_products")
+      .select("stock")
+      .eq("id", oldLog.finished_product_id)
+      .single();
+    if (Number(oldFp?.stock || 0) - Number(oldLog.quantity_produced) < 0) {
+      throw new Error(
+        "Cannot change product type. The original oil has already been sold!",
+      );
+    }
+  }
+
+  // 3. REVERSE OLD RAW MATERIALS (Refund to stock)
+  if (oldConsumptions) {
+    for (const oc of oldConsumptions) {
+      const { data: rm } = await supabase
+        .from("materials")
+        .select("stock")
+        .eq("id", oc.raw_material_id)
+        .single();
+      if (rm) {
+        await supabase
+          .from("materials")
+          .update({ stock: Number(rm.stock) + Number(oc.quantity_used) })
+          .eq("id", oc.raw_material_id);
+        await supabase.from("material_transactions").insert({
+          material_id: oc.raw_material_id,
+          transaction_type: "Production Edit Refund",
+          quantity: Math.abs(Number(oc.quantity_used)),
+          reason: `Refunded from edited production log`,
+        });
+      }
+    }
+    // Delete old consumption records
+    await supabase
+      .from("production_material_consumption")
+      .delete()
+      .eq("production_log_id", log_id);
+  }
+
+  // 4. REVERSE OLD FINISHED PRODUCT
+  const { data: oldFpStock } = await supabase
+    .from("finished_products")
+    .select("stock")
+    .eq("id", oldLog.finished_product_id)
+    .single();
+  if (oldFpStock) {
+    const revertedStock =
+      Number(oldFpStock.stock) - Number(oldLog.quantity_produced);
+    await supabase
+      .from("finished_products")
+      .update({ stock: revertedStock })
+      .eq("id", oldLog.finished_product_id);
+  }
+
+  // 5. APPLY NEW RAW MATERIALS & CALCULATE COST
+  const materialIds = new_consumed_materials.map((m) => m.material_id);
+  const { data: rawMaterials } = await supabase
+    .from("materials")
+    .select("id, stock, name, cost_per_unit")
+    .in("id", materialIds);
+
+  let totalProductionCost = 0;
+  for (const consumed of new_consumed_materials) {
+    const rm = rawMaterials?.find((m) => m.id === consumed.material_id);
+    if (!rm) throw new Error("Raw Material not found.");
+    if (consumed.quantity > (rm.stock || 0)) {
+      throw new Error(`Insufficient stock for ${rm.name}.`);
+    }
+    totalProductionCost += consumed.quantity * Number(rm.cost_per_unit || 0);
+  }
+
+  // 6. APPLY NEW FINISHED PRODUCT MATH
+  const { data: newFp } = await supabase
+    .from("finished_products")
+    .select("stock, cost_per_unit")
+    .eq("id", new_fp_id)
+    .single();
+  let currentFPStock = Number(newFp?.stock || 0);
+  let currentFPCost = Number(newFp?.cost_per_unit || 0);
+
+  const currentFPValue = currentFPStock * currentFPCost;
+  const newFPStock = currentFPStock + new_qty_produced;
+  const newFPAvgCost =
+    newFPStock > 0 ? (currentFPValue + totalProductionCost) / newFPStock : 0;
+
+  // Update FP
+  await supabase
+    .from("finished_products")
+    .update({
+      stock: newFPStock,
+      cost_per_unit: newFPAvgCost,
+    })
+    .eq("id", new_fp_id);
+
+  // 7. UPDATE LOG & INSERT NEW CONSUMPTIONS
+  await supabase
+    .from("production_logs")
+    .update({
+      finished_product_id: new_fp_id,
+      quantity_produced: new_qty_produced,
+    })
+    .eq("id", log_id);
+
+  for (const consumed of new_consumed_materials) {
+    const rm = rawMaterials?.find((m) => m.id === consumed.material_id);
+    const newRMStock = Number(rm?.stock || 0) - consumed.quantity;
+
+    await supabase
+      .from("materials")
+      .update({ stock: newRMStock })
+      .eq("id", consumed.material_id);
+
+    await supabase.from("production_material_consumption").insert({
+      production_log_id: log_id,
+      raw_material_id: consumed.material_id,
+      quantity_used: consumed.quantity,
+    });
+
+    await supabase.from("material_transactions").insert({
+      material_id: consumed.material_id,
+      transaction_type: "Production Use",
+      quantity: -Math.abs(consumed.quantity),
+      reason: `Used in edited production log`,
+    });
+  }
+
+  revalidatePath("/finished-products");
+}

@@ -187,7 +187,7 @@ export default function FinishedProductRowActions({
                     required
                   >
                     <option value="Ltr">Liter (Ltr)</option>
-                    <option value="KG">Kilogram (KG)</option>
+                    <option value="KG">Kilogram (Kg)</option>
                   </select>
                 </div>
               </div>

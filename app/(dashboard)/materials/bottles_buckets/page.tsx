@@ -68,17 +68,17 @@ export default async function ContainersPage({
 
   const totalPages = Math.ceil(count / pageSize);
 
+  // We only fetch Box and Cap now, Stickers removed from here!
   const { data: materialsData, error: materialsError } = await supabase
     .from("materials")
     .select("id, name, type")
-    .in("type", ["Box", "Sticker", "Cap"]);
+    .in("type", ["Box", "Cap"]);
 
   if (materialsError)
     console.error("Error fetching materials:", materialsError);
 
   const safeMaterials = materialsData || [];
   const boxes = safeMaterials.filter((m) => m.type === "Box");
-  const stickers = safeMaterials.filter((m) => m.type === "Sticker");
   const caps = safeMaterials.filter((m) => m.type === "Cap");
 
   const getMaterialName = (id: string | null) => {
@@ -128,9 +128,9 @@ export default async function ContainersPage({
             <div className="p-4 border-b border-gray-100 flex flex-col xl:flex-row justify-between items-center gap-4 bg-white shrink-0">
               <ContainerFilters />
               <div className="flex items-center gap-2 shrink-0">
+                {/* Removed stickers prop */}
                 <AddContainerModal
                   boxes={boxes}
-                  stickers={stickers}
                   caps={caps}
                   existingContainers={safeAllContainers}
                 />
@@ -141,7 +141,7 @@ export default async function ContainersPage({
               <table className="erp-table w-full table-fixed min-w-[1100px]">
                 <thead className="sticky top-0 z-10 bg-gray-50/90 backdrop-blur-sm">
                   <tr>
-                    <th className="w-[20%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[25%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Name
                     </th>
                     <th className="w-[10%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
@@ -153,15 +153,13 @@ export default async function ContainersPage({
                     <th className="w-[10%] text-center p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Capacity
                     </th>
-                    <th className="w-[14%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[18%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Master Box
                     </th>
-                    <th className="w-[14%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
+                    <th className="w-[15%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Cap
                     </th>
-                    <th className="w-[10%] text-left p-4 text-xs font-bold text-gray-500 uppercase border-b">
-                      Sticker
-                    </th>
+                    {/* Removed Sticker Header */}
                     <th className="w-[10%] text-right p-4 text-xs font-bold text-gray-500 uppercase border-b">
                       Actions
                     </th>
@@ -267,32 +265,13 @@ export default async function ContainersPage({
                             )}
                           </td>
 
-                          <td className="p-4 text-left align-middle">
-                            {container.sticker_id ? (
-                              <>
-                                <div className="text-sm font-semibold text-gray-700 truncate">
-                                  {getMaterialName(container.sticker_id) ||
-                                    "Missing Sticker!"}
-                                </div>
-                                <div className="text-xs text-gray-500 font-medium mt-0.5">
-                                  Qty:{" "}
-                                  <span className="text-blue-600 font-bold">
-                                    {container.sticker_quantity}
-                                  </span>
-                                </div>
-                              </>
-                            ) : (
-                              <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2 py-1 rounded-md border border-gray-200">
-                                Not Required
-                              </span>
-                            )}
-                          </td>
+                          {/* Removed Sticker Cell */}
 
                           <td className="p-4 text-right align-middle">
+                            {/* Removed stickers prop */}
                             <ContainerRowActions
                               container={container}
                               boxes={boxes}
-                              stickers={stickers}
                               caps={caps}
                               existingContainers={safeAllContainers}
                             />
@@ -303,7 +282,7 @@ export default async function ContainersPage({
                   ) : (
                     <tr>
                       <td
-                        colSpan={8}
+                        colSpan={7}
                         className="text-center py-20 text-gray-400"
                       >
                         No Bottles/Buckets found.
@@ -361,7 +340,8 @@ export default async function ContainersPage({
                 <tbody>
                   {transactionsData.length ? (
                     transactionsData.map((txn) => {
-                      const totalAmount = Number(txn.quantity) * Number(txn.rate);
+                      const totalAmount =
+                        Number(txn.quantity) * Number(txn.rate);
 
                       return (
                         <tr
@@ -394,7 +374,6 @@ export default async function ContainersPage({
                             {new Date(txn.created_at).toLocaleDateString()}
                           </td>
                           <td className="p-4 text-right">
-                            {/* 🔥 Edit button is ALWAYS visible! */}
                             <EditContainerStockInModal transaction={txn} />
                           </td>
                         </tr>
