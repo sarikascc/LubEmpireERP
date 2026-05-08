@@ -30,6 +30,7 @@ export async function createOrderAction(formData: FormData) {
   const container_id = formData.get("container_id") as string;
   const boxes_quantity = Number(formData.get("boxes_quantity"));
   const rate_per_piece = Number(formData.get("rate_per_piece"));
+  const order_date = (formData.get("order_date") as string) || "";
 
   const sticker_id = (formData.get("sticker_id") as string) || null;
   const sticker_quantity = Number(formData.get("sticker_quantity")) || 0;
@@ -50,6 +51,12 @@ export async function createOrderAction(formData: FormData) {
   if (!container || !fp || !customer_name) {
     return { error: "Missing required data to process this order." };
   }
+
+  // If user picked a date (YYYY-MM-DD), store it as UTC midnight for stable filtering
+  const createdAt =
+    order_date && /^\d{4}-\d{2}-\d{2}$/.test(order_date)
+      ? `${order_date}T00:00:00.000Z`
+      : undefined;
 
   const total_pieces = boxes_quantity * container.pieces_per_box;
   const total_amount = total_pieces * rate_per_piece;
@@ -168,6 +175,7 @@ export async function createOrderAction(formData: FormData) {
     calculated_profit: realCalculatedProfit,
     sticker_id,
     sticker_quantity,
+    ...(createdAt ? { created_at: createdAt } : {}),
   });
 
   if (orderError) return { error: `Order Error: ${orderError.message}` };
@@ -182,6 +190,7 @@ export async function createOrderAction(formData: FormData) {
     unit: "Boxes",
     description: `Sales Order - ${customer_name} (${boxes_quantity} Cartons of ${fp.product_name})`,
     profit: realCalculatedProfit,
+    ...(createdAt ? { created_at: createdAt } : {}),
   });
 
   revalidatePath("/", "layout");

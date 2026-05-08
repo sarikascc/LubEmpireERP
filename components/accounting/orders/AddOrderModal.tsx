@@ -46,6 +46,14 @@ export default function AddOrderModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  const [orderDate, setOrderDate] = useState(() => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
+
   const [selectedProductId, setSelectedProductId] = useState("");
   const [selectedContainerId, setSelectedContainerId] = useState("");
   const [boxesQty, setBoxesQty] = useState<number | "">("");
@@ -173,6 +181,10 @@ export default function AddOrderModal({
       setErrorMsg("Please select packaging.");
       return;
     }
+    if (!orderDate) {
+      setErrorMsg("Please select an order date.");
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -192,6 +204,14 @@ export default function AddOrderModal({
       setSelectedProductId("");
       setSelectedContainerId("");
       setSelectedStickerId("");
+      // reset back to today for the next order
+      {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        setOrderDate(`${yyyy}-${mm}-${dd}`);
+      }
       router.refresh();
     } catch (error: any) {
       console.error(error);
@@ -281,6 +301,18 @@ export default function AddOrderModal({
                     required
                     placeholder="e.g., Reliance Industries"
                     className={glassInput}
+                  />
+                </div>
+
+                <div>
+                  <label className={labelClass}>Order Date</label>
+                  <input
+                    type="date"
+                    name="order_date"
+                    required
+                    className={glassInput}
+                    value={orderDate}
+                    onChange={(e) => setOrderDate(e.target.value)}
                   />
                 </div>
 
