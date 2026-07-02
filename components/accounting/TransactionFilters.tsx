@@ -89,6 +89,11 @@ export default function TransactionFilters({
       const debitValue = isIncome ? "-" : Number(rawAmount.toFixed(2));
       const creditValue = isIncome ? Number(rawAmount.toFixed(2)) : "-";
 
+      const profitLoss =
+        isIncome && entry.profit != null
+          ? Number(Number(entry.profit).toFixed(2))
+          : "-";
+
       return {
         Date: safeDate,
         Type: isIncome ? "SALES" : "PURCHASE",
@@ -98,9 +103,9 @@ export default function TransactionFilters({
         Unit: entry.unit || "PCS",
         "Rate (₹)":
           entry.rate != null ? Number(Number(entry.rate).toFixed(2)) : 0,
-        // 🔥 Replaced "Amount" and "Profit" with Debit/Credit columns
         "Debit (₹)": debitValue,
         "Credit (₹)": creditValue,
+        "Profit/Loss (₹)": profitLoss,
       };
     });
 
@@ -119,6 +124,7 @@ export default function TransactionFilters({
       { wch: 12 }, // Rate
       { wch: 15 }, // Debit
       { wch: 15 }, // Credit
+      { wch: 15 }, // Profit/Loss
     ];
 
     const filename = `LubEmpire_Ledger_${new Date().toISOString().split("T")[0]}.xlsx`;

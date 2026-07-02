@@ -3,16 +3,24 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
-export default function PasswordInput() {
+export default function PasswordInput({
+  name = "password",
+  placeholder = "••••••••",
+  className = "input-field w-full pr-10",
+}: {
+  name?: string;
+  placeholder?: string;
+  className?: string;
+}) {
   const [showPassword, setShowPassword] = useState(false);
 
   return (
     <div className="relative">
       <input
-        className="input-field w-full pr-10"
+        className={className}
         type={showPassword ? "text" : "password"}
-        name="password"
-        placeholder="••••••••"
+        name={name}
+        placeholder={placeholder}
         required
       />
       <button
